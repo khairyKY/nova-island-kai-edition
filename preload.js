@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('nova', {
   onScreenshot: on('screenshot'),
   onNetwork: on('network'),
   onKaiNotice: on('kai-notice'),
+  onAppNotice: on('app-notice'),
   onClipSmart: on('clip-smart'),
   onNear: on('near'),
   clipAction: (action) => ipcRenderer.send('clip-action', action),

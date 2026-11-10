@@ -284,6 +284,26 @@ svg.s { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: rou
   --kai-notice-accent: #4d6650;
 }
 #island.toast.kai-notice { --w: 420px; --h: 110px; --r: 23px; }
+/* Other apps' notices (Claude): the island's own surface, the app's accent on the label, icon and glow */
+#island.toast.app-notice { --w: 380px; --h: 74px; --r: 22px; --app: rgb(var(--app-rgb, var(--accent-rgb))); }
+#island.app-notice .glow { opacity: 1; background: radial-gradient(90% 160% at 0% 50%, rgba(var(--app-rgb, var(--accent-rgb)), .26), transparent 70%); }
+#island.app-notice .kai-notice-close { color: var(--text-1); background: var(--fill-1); }
+.l-toast.app-notice {
+  display: grid; grid-template: "ico source" auto "ico title" auto "ico body" auto / 26px minmax(0, 1fr);
+  align-content: center; gap: 2px 12px; padding: 0 46px 0 18px;
+}
+.l-toast.app-notice .t-left { display: contents; }
+.l-toast.app-notice::before {
+  grid-area: source; content: attr(data-source); color: var(--app);
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+}
+.l-toast.app-notice .t-ico { display: none; }
+.l-toast.app-notice[data-icon="spark"] .ico-spark, .l-toast.app-notice[data-icon="bell"] .ico-bell {
+  display: block; grid-area: ico; align-self: center; width: 24px; height: 24px; color: var(--app); stroke-width: 2.2;
+}
+.l-toast.app-notice #t-label { grid-area: title; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.l-toast.app-notice #t-value { grid-area: body; color: var(--text-2); font-size: 12px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.l-toast.app-notice .batt, .l-toast.app-notice .t-bar { display: none; }
 #island.toast.kai-notice.kai-compact { --w: 380px; --h: 74px; }
 #island.kai-notice .l-toast, #island.kai-notice .l-vtoast {
   background: var(--kai-notice-paper);

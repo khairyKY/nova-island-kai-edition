@@ -4,6 +4,7 @@
   const labels = {
     task_reminder: 'Task reminder', focus_done: 'Focus complete', test: 'Test notification',
     morning_digest: 'Morning digest', evening_nudge: 'Evening nudge', overdue: 'Overdue',
+    claude_input: 'Needs you', claude_done: 'Finished',
   };
   const switches = {
     task_reminder: 'kaiTaskReminders', focus_done: 'kaiFocusDone', test: 'kaiTestNotices',
@@ -19,9 +20,10 @@
     const notice = queue.shift();
     const toast = document.querySelector('.l-toast');
     toast.dataset.kind = notice.kind;
-    toast.dataset.source = 'Kai’s Flow · ' + (labels[notice.kind] || 'Notification');
+    const claude = notice.kind.startsWith('claude_');
+    toast.dataset.source = (claude ? 'Claude · ' : 'Kai’s Flow · ') + (labels[notice.kind] || 'Notification');
     const duration = (state.features.kaiNoticeSeconds || 8) * 1000;
-    showToast('kai-flow', notice.title, notice.body, 0, duration, () => bridge.apps.launch('com.kaisflow.garden'));
+    showToast('kai-flow', notice.title, notice.body, 0, duration, claude ? null : () => bridge.apps.launch('com.kaisflow.garden'));
   }
   bridge.onKaiNotice((notice) => {
     if (!allowed(notice)) return;
@@ -36,7 +38,7 @@
   bridge.onVisibility(requestNext);
   $('#kai-notice-close').addEventListener('click', event => {
     event.stopPropagation();
-    if (lastMode !== 'toast' || state.toast !== 'kai-flow') return;
+    if (lastMode !== 'toast' || !['kai-flow', 'app-notice'].includes(state.toast)) return;
     state.hover = false;
     dismissToast();
   });

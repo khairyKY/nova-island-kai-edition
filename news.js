@@ -11,7 +11,8 @@ const URL = 'https://raw.githubusercontent.com/NOVA-TECH-KIT/nova-island/main/ne
 const FIRST_MS = 2 * 60 * 1000;
 const EVERY_MS = 15 * 60 * 1000; // a ~1 KB file; GitHub itself caches it for about 5 minutes
 const DAY_MS = 24 * 60 * 60 * 1000;
-const TYPES = ['plugin', 'update', 'news'];
+// no 'update': those point at the original's installer, and this edition updates from its own releases
+const TYPES = ['plugin', 'news'];
 // nova://plugins/<id>, nova://settings/<page>, or Nova's own pages on the web
 const LINK = /^(nova:\/\/(plugins|settings)\/[\w-]+|https:\/\/(github\.com\/NOVA-TECH-KIT\/[\w./#?=&-]*|ko-fi\.com\/binamer|ipn\.eg\/S\/binamerbm\/[\w/]+))$/;
 

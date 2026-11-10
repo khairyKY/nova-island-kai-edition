@@ -46,11 +46,18 @@ const { resolve: resolveMediaSource } = require('./media-sources');
 const { createSpotify } = require('./spotify');
 const { stripBackdrop } = require('./backdrop');
 const browserCompanion = require('./browser-companion-setup');
-const { createNoticeBridge } = require('./kai-notices');
+const { createNoticeBridge, appNotice } = require('./kai-notices');
 const kaiNotices = createNoticeBridge(
   path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'KaiFlowIsland'),
   (notice) => { if (win && !win.isDestroyed() && !screenLocked) send('kai-notice', notice); },
   (err) => log.info(`[kai-notices] ${err.code || err.message}`)
+);
+// other apps' notices (tools/island-notify.cjs, run by Claude Code hooks)
+const appNotices = createNoticeBridge(
+  path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'NovaIslandNotices'),
+  (notice) => { if (win && !win.isDestroyed() && !screenLocked) send('app-notice', notice); },
+  (err) => log.info(`[app-notices] ${err.code || err.message}`),
+  { prefix: 'nova-island-notices-', normalize: appNotice }
 );
 
 // Keep our own windows (the mini player) out of Windows' media sessions, so the island and
@@ -1383,6 +1390,7 @@ let prayerCalc = `${features.get().asrHanafi}|${features.get().hijriAdjust}`;
 let autoUpdate = features.get().autoUpdate;
 let newsOn = features.get().news;
 features.onChange((f) => {
+  appNotices.setEnabled(f.appNotices !== false);
   evalSaver();
   applyPerf();
   layout();
@@ -1480,6 +1488,7 @@ app.whenReady().then(() => {
   migrateStartup();
   if (process.argv.includes('--setup')) runSetup();
   createWindow();
+  appNotices.setEnabled(features.get().appNotices !== false);
   if (app.isPackaged) setTimeout(() => otherNova.check(win).catch((err) => log.info(`[other-nova] ${err.message}`)), 4000);
   buildTray();
   startMedia();
@@ -1548,6 +1557,7 @@ app.on('before-quit', () => {
   clearTimeout(switcherHideTimer);
   clearTimeout(placementTimer);
   kaiNotices.setEnabled(false);
+  appNotices.setEnabled(false);
   browserMedia.stop();
   spotify?.stop();
   globalShortcut.unregisterAll();

@@ -17,15 +17,35 @@ function noticeKind(notice) {
   return 'task_reminder';
 }
 
-function createNoticeBridge(directory, onNotice, onError) {
+const kaiNotice = (n) => ({ kind: noticeKind(n), title: n.title.slice(0, 160), body: n.body.slice(0, 360) });
+
+// Other apps' notices (Claude Code hooks): own pipe and endpoint, never styled as Kai's Flow.
+const APP_ID = /^[a-z][a-z0-9-]{0,23}$/;
+const appNotice = (n) => (typeof n.app === 'string' && APP_ID.test(n.app)
+  ? { app: n.app, label: typeof n.label === 'string' ? n.label.slice(0, 24) : '', title: n.title.slice(0, 160), body: n.body.slice(0, 360) }
+  : null);
+
+function createNoticeBridge(directory, onNotice, onError, { prefix = 'kais-flow-island-', normalize = kaiNotice } = {}) {
   const endpoint = path.join(directory, 'endpoint');
   let server = null;
+  let current = '';
+  // Another island (the original Nova Island, starting at login) writes the same file. If it
+  // replaced ours, put ours back: otherwise notices go to a pipe that no longer exists.
+  function reclaim() {
+    if (!server || !current) return;
+    let onDisk = '';
+    try { onDisk = fs.readFileSync(endpoint, 'utf8'); } catch {}
+    if (onDisk === current) return;
+    try { fs.mkdirSync(directory, { recursive: true }); fs.writeFileSync(endpoint, current); } catch (err) { onError(err); }
+  }
 
   function setEnabled(on) {
     if (!!server === on) return;
     if (!on) {
       const previous = server;
       server = null;
+      current = '';
+      fs.unwatchFile(endpoint, reclaim);
       try { fs.rmSync(endpoint, { force: true }); } catch (err) { onError(err); }
       previous.close();
       return;
@@ -48,7 +68,8 @@ function createNoticeBridge(directory, onNotice, onError) {
         let notice;
         try { notice = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return; }
         if (notice?.token !== token || typeof notice.title !== 'string' || !notice.title.trim() || typeof notice.body !== 'string') return;
-        onNotice({ kind: noticeKind(notice), title: notice.title.slice(0, 160), body: notice.body.slice(0, 360) });
+        const clean = normalize(notice);
+        if (clean) onNotice(clean);
       });
     });
     server = listener;
@@ -56,11 +77,13 @@ function createNoticeBridge(directory, onNotice, onError) {
       if (server === listener) setEnabled(false);
       onError(err);
     });
-    listener.listen('\\\\.\\pipe\\kais-flow-island-' + pipeId, () => {
+    listener.listen('\\\\.\\pipe\\' + prefix + pipeId, () => {
       if (server !== listener) return;
       try {
         fs.mkdirSync(directory, { recursive: true });
-        fs.writeFileSync(endpoint, pipeId + token);
+        current = pipeId + token;
+        fs.writeFileSync(endpoint, current);
+        fs.watchFile(endpoint, { interval: 5000 }, reclaim);
       } catch (err) {
         setEnabled(false);
         onError(err);
@@ -70,4 +93,4 @@ function createNoticeBridge(directory, onNotice, onError) {
   return { setEnabled };
 }
 
-module.exports = { createNoticeBridge, noticeKind };
+module.exports = { createNoticeBridge, noticeKind, appNotice };

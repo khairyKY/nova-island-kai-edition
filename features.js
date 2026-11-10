@@ -41,6 +41,7 @@ const DEFAULTS = {
   kaiTestNotices: true,
   kaiNoticeStyle: 'card',
   kaiNoticeSeconds: 8,
+  appNotices: true, // other apps' notices on the island (Claude Code, through its hooks)
   // performance (the battery saver turns all three on while the battery is low)
   noBlur: false, // solid island, no screen capture at all
   noAnimations: false,

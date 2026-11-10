@@ -3,6 +3,8 @@
 // once the cursor is on the island (hover), the island opens as usual and the eyes are gone.
 (() => {
   const DWELL_MS = 3000;
+  // the performance options turn the eyes off (the island stays still)
+  const light = () => !!(state.features.noBlur || state.features.noAnimations);
   const eyes = $('.eyes');
   const pupils = [...$$('.eye b')];
   let near = null;

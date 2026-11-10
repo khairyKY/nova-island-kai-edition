@@ -91,12 +91,14 @@ function compactKind() {
   return '';
 }
 
+const NOTICES = ['kai-flow', 'app-notice'];
 function currentMode() {
   const now = Date.now();
   // a character scene (adhan, water, focus) owns the island until it ends or is closed
   if (state.sceneUntil > now && (!anchor.vertical || island.classList.contains('sc-phoenix') || island.classList.contains('sc-plain'))) return 'scene';
   // a toast with a button (Join) stays under the cursor so it can be clicked
-  if (state.toastAction && state.toast && now < state.toastUntil && !state.pinned) return 'toast';
+  // notices stay put under the cursor too: hovering pauses them instead of opening the island
+  if ((state.toastAction || NOTICES.includes(state.toast)) && state.toast && now < state.toastUntil && !state.pinned) return 'toast';
   // a reminder stays put under the cursor so it can be read (hovering pauses it)
   if (state.reminderUntil > now && !state.pinned && !state.dragging) {
     return state.toast && now < state.toastUntil ? 'toast' : 'reminder';
@@ -123,12 +125,15 @@ function render() {
     lastMode = mode;
   }
   const kaiNotice = mode === 'toast' && state.toast === 'kai-flow';
+  const appNoticeOn = mode === 'toast' && state.toast === 'app-notice';
   const sideHud = mode === 'toast' && (state.toast === 'vol' || state.toast === 'bright');
-  const changedToastSize = kaiNotice !== island.classList.contains('kai-notice') || sideHud !== island.classList.contains('side-hud');
+  const changedToastSize = kaiNotice !== island.classList.contains('kai-notice') || appNoticeOn !== island.classList.contains('app-notice') || sideHud !== island.classList.contains('side-hud');
   island.classList.toggle('kai-notice', kaiNotice);
+  island.classList.toggle('app-notice', appNoticeOn);
   island.classList.toggle('side-hud', sideHud);
   const noticeClose = $('#kai-notice-close');
-  if (noticeClose.hidden === kaiNotice) noticeClose.hidden = !kaiNotice;
+  const closable = kaiNotice || appNoticeOn;
+  if (noticeClose.hidden === closable) noticeClose.hidden = !closable;
   island.classList.toggle('kai-compact', state.features.kaiNoticeStyle === 'compact');
   island.classList.toggle('has-media', !!state.media.has);
   island.classList.toggle('playing', !!state.media.playing);
@@ -185,6 +190,12 @@ window.addEventListener('island:mode', (e) => {
 let hoverTimer = null;
 bridge.onHover((v) => {
   clearTimeout(hoverTimer);
+  // a notice under the cursor waits; it ends 2.5 s after the cursor leaves
+  if (NOTICES.includes(state.toast) && lastMode === 'toast') {
+    clearTimeout(toastTimer);
+    if (v) state.toastUntil = Infinity;
+    else { state.toastUntil = Date.now() + 2500; toastTimer = setTimeout(dismissToast, 2550); }
+  }
   if (v) {
     state.hover = true;
     render();
@@ -203,7 +214,7 @@ let target = null;
 function reportRect() {
   // something on the island to click (a toast with a button, a reminder or a scene): over the
   // browser in "Stay in place" it takes the mouse again for as long as it's there
-  const clickable = (lastMode === 'toast' && !!state.toastAction && Date.now() < state.toastUntil) || lastMode === 'reminder' || lastMode === 'scene';
+  const clickable = (lastMode === 'toast' && (!!state.toastAction || NOTICES.includes(state.toast)) && Date.now() < state.toastUntil) || lastMode === 'reminder' || lastMode === 'scene';
   let r = target && !state.moving ? target : island.getBoundingClientRect();
   // during a scene the card beside the character must take the mouse too
   if (lastMode === 'scene') {
@@ -291,7 +302,9 @@ let anchor = { x: window.innerWidth / 2, y: 8, docked: false, vertical: false, s
 
 function positionIsland() {
   let [w, h] = (anchor.vertical ? VDIMS : DIMS)[lastMode] || DIMS.idle;
-  if (lastMode === 'toast' && state.toast === 'kai-flow') {
+  if (lastMode === 'toast' && state.toast === 'app-notice') {
+    [w, h] = [380, 74];
+  } else if (lastMode === 'toast' && state.toast === 'kai-flow') {
     [w, h] = state.features.kaiNoticeStyle === 'compact' ? [380, 74] : [420, 110];
   } else if (anchor.vertical && lastMode === 'toast' && !island.classList.contains('side-hud')) {
     [w, h] = [340, 76];
