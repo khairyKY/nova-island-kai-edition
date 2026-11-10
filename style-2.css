@@ -1,0 +1,83 @@
+/* Ported from Nova Island 1.8.6 style-2.css, on top of style.css: the Apps pages, clipboard pins,
+   the timer's − and +, the update dot and the reminder copy button. */
+
+/* Apps tab: pages of 6 x 2 that slide sideways, and their dots in the bar */
+.apps-grid.paged { display: flex; gap: 0; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.apps-grid.paged::-webkit-scrollbar { display: none; }
+.apps-page {
+  flex: 0 0 100%; min-width: 0; display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 62px; gap: 2px 6px;
+  align-content: start; scroll-snap-align: start;
+}
+.apps-dots { display: flex; gap: 5px; align-items: center; margin-inline-start: auto; margin-inline-end: 10px; }
+.apps-dots .dot { width: 6px; height: 6px; padding: 0; border-radius: 50%; background: var(--fill-2); transition: background .2s, width .25s var(--spring); }
+.apps-dots .dot.on { width: 14px; border-radius: 3px; background: rgba(var(--accent-rgb), .9); }
+
+/* Clipboard (1.8.3): one line per clip with Pin and Show all on hover; pinned clips first; the
+   full view over the list, inside the same card */
+.clips { position: relative; }
+.clip-row { display: flex; align-items: center; gap: 2px; border-radius: 9px; flex: none; min-width: 0; transition: background var(--dur-fast); }
+.clip-row:hover { background: var(--fill-1); }
+.clip-row .clip-item { flex: 1; min-width: 0; }
+.clip-row .clip-item:hover { background: none; }
+.clip-tools { display: flex; gap: 1px; opacity: 0; transition: opacity var(--dur-fast); flex: none; }
+.clip-row:hover .clip-tools, .clip-row.pinned .clip-tools { opacity: 1; }
+.clip-tools .mini-btn { width: 22px; height: 22px; }
+.clip-tools svg { width: 12px; height: 12px; }
+.clip-row.pinned .clip-tools .pin { color: rgb(var(--accent-rgb)); }
+.clip-row.pinned .clip-tools .pin svg { fill: currentColor; }
+.clip-row.pinned:not(:hover) .clip-tools [data-act="open"] { display: none; }
+.clip-row.pinned + .clip-row:not(.pinned) { margin-top: 3px; box-shadow: 0 -1px 0 var(--fill-1); border-radius: 0 0 9px 9px; }
+.clip-full {
+  position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 8px 10px;
+  border-radius: inherit;
+  animation: clip-full-in .22s var(--ease-out, ease-out);
+}
+.clip-full[hidden] { display: none; }
+.clips.reading .clip-list, .clips.reading .clips-head { visibility: hidden; }
+@keyframes clip-full-in { from { opacity: 0; transform: translateY(4px); } }
+.clip-full-head { display: flex; align-items: center; gap: 4px; }
+.clip-full-meta { flex: 1; font-size: 11px; color: var(--text-3); }
+.clip-full.pinned [data-act="pin"] { color: rgb(var(--accent-rgb)); }
+.clip-full.pinned [data-act="pin"] svg { fill: currentColor; }
+.clip-full.copied [data-act="copy"] { color: var(--green); }
+.clip-full-text {
+  flex: 1; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.45;
+  color: var(--text-1); padding: 2px 4px 2px 2px; user-select: text; -webkit-user-select: text;
+}
+.clip-full-text::-webkit-scrollbar { width: 6px; }
+.clip-full-text::-webkit-scrollbar-thumb { background: var(--fill-2); border-radius: 3px; }
+
+/* the clipboard list scrolls inside its card (1.8.4): with several clips it grew past the island */
+.sys { min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.sys > .card { min-height: 0; }
+.clips { min-height: 0; overflow: hidden; }
+.clip-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* (its white scrollbar left out: style.css's themed one stays, for the light Kai themes) */
+
+/* the timer's − and + (2.0, views/timer-plus.js), beside Start */
+.tm-step { width: 40px; padding: 0; flex: none; font-size: 19px; font-weight: 600; }
+
+/* an update is waiting (1.8.6, views/update.js): a small green dot on the island until it's in */
+#island.update-ready::after {
+  content: ""; position: absolute; top: 6px; right: 13px; z-index: 30; width: 8px; height: 8px; border-radius: 50%;
+  background: #30d158; box-shadow: 0 0 0 3px rgba(48, 209, 88, .22); pointer-events: none; animation: upd-dot 2s ease-in-out infinite;
+}
+@keyframes upd-dot { 50% { box-shadow: 0 0 0 6px rgba(48, 209, 88, .08); } }
+
+/* the reminder card's copy button (1.8.6), beside its close button */
+.rm-tools { display: inline-flex; align-items: center; gap: 4px; }
+.rm-copy svg { width: 13px; height: 13px; stroke-width: 2; }
+.rm-copy.done { color: #30d158; }
+
+/* Pady's notices: a drop of the island's glass under it (views/pady-drop.js) */
+.pady-drop { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+/* the drop's glass body sits exactly under the island, so the island stays on top of it */
+#island { z-index: 2; }
+.pd-goo { position: absolute; inset: 0; filter: url(#goo) drop-shadow(0 8px 14px rgba(0, 0, 0, .22)); }
+.pd-body, .pd-bead { position: absolute; display: block; }
+.pd-text {
+  position: absolute; transform: translate(-50%, -50%); white-space: nowrap; opacity: 0;
+  display: flex; align-items: center; gap: 6px; color: var(--text-1);
+  font: 600 13px/1 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+.pd-text::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: rgb(var(--accent-rgb)); flex: none; }

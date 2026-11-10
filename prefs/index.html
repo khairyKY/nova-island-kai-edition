@@ -68,6 +68,7 @@
             </div>
             <label class="row"><b>Hide in full screen</b><input type="checkbox" class="sw" data-feature="hideFullscreen"></label>
             <label class="row" id="update-row"><div class="txt"><b>Auto-update</b><small id="local-update-note" hidden></small></div><input type="checkbox" class="sw" data-feature="autoUpdate"></label>
+            <div class="row"><div class="txt"><b>Updates</b><small id="update-status"></small></div><button class="btn" id="update-check">Check now</button></div>
             <div class="row"><b>Position</b><button class="btn" data-general-action="resetPosition">Reset</button></div>
             <div class="row"><div class="txt"><b>Island scale</b><small>Resize text, controls and panels; fits the display and browser toolbar.</small></div>
               <div class="stepper" data-num="islandScale" data-steps="80,90,100,110,125,150,175,200" data-unit="%"><button data-dir="-1" aria-label="Smaller island">−</button><output></output><button data-dir="1" aria-label="Larger island">+</button></div>
@@ -113,6 +114,12 @@
             <label class="chip"><input type="checkbox" data-feature="tabSystem" data-tab><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><b>System</b></label>
           </div>
           <p class="hint warn" id="tabs-warn" hidden>Keep at least one tab</p>
+        </div>
+        <div class="group">
+          <h2>Apps</h2>
+          <div class="card">
+            <label class="row"><div class="txt"><b>Open apps first</b><small>Apps with an open window lead the Apps tab</small></div><input type="checkbox" class="sw" data-feature="appsRunningFirst"></label>
+          </div>
         </div>
         <div class="group">
           <h2>Collapsed</h2>
@@ -288,7 +295,7 @@
           <h2>Privacy</h2>
           <div class="card">
             <label class="row"><b>Mic &amp; camera dots</b><input type="checkbox" class="sw" data-feature="privacyDots"></label>
-            <label class="row"><div class="txt"><b>Clipboard history</b><small>Kept in memory only</small></div><input type="checkbox" class="sw" data-feature="clipboardHistory"></label>
+            <label class="row"><div class="txt"><b>Clipboard history</b><small>Kept in memory only; pinned clips are saved</small></div><input type="checkbox" class="sw" data-feature="clipboardHistory"></label>
           </div>
         </div>
       </section>

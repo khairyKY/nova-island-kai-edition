@@ -30,8 +30,25 @@ function tickStats() {
 // ---- clipboard (kept in memory only; may contain sensitive text) ----
 // Read only when Windows reports a new copy (the helper's clipboard sequence). The helper also
 // says whether a password manager marked the copy as private; those are never read.
-const MAX_CLIPS = 8;
-let clips = [];
+// Pinned clips (1.8.6) come first, are kept when the history is trimmed or cleared, and are the
+// only ones saved to disk: the user chose to keep them.
+const MAX_CLIPS = 8; // unpinned
+const MAX_PINS = 20;
+const PIN_FILE = 'clip-pins.json';
+let clips = features.get().clipboardHistory
+  ? [].concat(settings.load(PIN_FILE, [])).filter((t) => typeof t === 'string' && t).slice(0, MAX_PINS).map((text) => ({ text, pinned: true }))
+  : [];
+const savePins = () => settings.save(PIN_FILE, clips.filter((c) => c.pinned).map((c) => c.text));
+// what the island gets: 300 characters a clip; the full view asks for the rest (clipFull)
+const clipView = () => clips.map(({ text, pinned }) => ({ text: text.slice(0, 300), pinned, long: text.length >= 300 || text.includes('\n'), chars: text.length }));
+const announce = () => send('clipboard', clipView());
+// a copy goes first among the unpinned; a pinned one stays where it is
+function remember(text) {
+  if (clips.some((c) => c.pinned && c.text === text)) return;
+  const pins = clips.filter((c) => c.pinned);
+  const rest = clips.filter((c) => !c.pinned && c.text !== text);
+  clips = [...pins, { text, pinned: false }, ...rest].slice(0, pins.length + MAX_CLIPS);
+}
 let lastClip = '';
 clipboard.readText().then((t) => { lastClip = t || ''; }).catch(() => {});
 async function clipboardChanged(isPrivate) {
@@ -46,8 +63,8 @@ async function clipboardChanged(isPrivate) {
     if (smart) send('clip-smart', smart);
   }
   if (!features.get().clipboardHistory) return;
-  clips = [text, ...clips.filter((c) => c !== text)].slice(0, MAX_CLIPS);
-  send('clipboard', clips.map((c) => c.slice(0, 300)));
+  remember(text);
+  announce();
 }
 let smart = null; // what the last copy was recognised as (acted on by nova.js)
 const lastSmart = () => smart;
@@ -58,16 +75,34 @@ function writeQuiet(text) {
 }
 
 function copyClip(i) {
-  const text = clips[i];
+  const text = clips[i]?.text;
   if (typeof text !== 'string') return;
   lastClip = text;
   clipboard.writeText(text).catch(() => {});
-  clips = [text, ...clips.filter((c) => c !== text)];
-  send('clipboard', clips.map((c) => c.slice(0, 300)));
+  remember(text);
+  announce();
 }
-function clearClips() {
-  clips = [];
-  send('clipboard', []);
+// the whole text of a long clip, for the full view
+const clipFull = (i) => clips[i]?.text ?? null;
+// pinned: last among the pinned; unpinned: first among the rest
+function pinClip(i, on) {
+  const c = clips[i];
+  if (!c || c.pinned === !!on) return;
+  if (on && clips.filter((x) => x.pinned).length >= MAX_PINS) return;
+  c.pinned = !!on;
+  const others = clips.filter((x) => x !== c);
+  const pins = others.filter((x) => x.pinned);
+  const rest = others.filter((x) => !x.pinned);
+  clips = on ? [...pins, c, ...rest] : [...pins, c, ...rest].slice(0, pins.length + MAX_CLIPS);
+  savePins();
+  announce();
+}
+// Clear keeps the pinned ones; all (history switched off) drops them too
+function clearClips(all = false) {
+  const hadPins = clips.some((c) => c.pinned);
+  clips = all ? [] : clips.filter((c) => c.pinned);
+  if (all && hadPins) savePins();
+  announce();
 }
 
 // ---- weather (Open-Meteo, location from IP) ----
@@ -226,7 +261,7 @@ async function fetchWeather() {
 }
 
 function snapshot() {
-  return { clips: clips.map((c) => c.slice(0, 300)), weather };
+  return { clips: clipView(), weather };
 }
 
 // CPU / RAM every 2 s, every 5 s with the performance options (or the battery saver) on
@@ -243,4 +278,4 @@ function start(sender) {
   fetchWeather();
 }
 
-module.exports = { start, setStatsEvery, copyClip, clearClips, snapshot, getLocation, refreshNow, locationInfo, searchCity, setLocation, onLocationChange, lastSmart, writeQuiet, clipboardChanged };
+module.exports = { start, setStatsEvery, copyClip, clipFull, pinClip, clearClips, snapshot, getLocation, refreshNow, locationInfo, searchCity, setLocation, onLocationChange, lastSmart, writeQuiet, clipboardChanged };

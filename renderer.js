@@ -91,7 +91,7 @@ function compactKind() {
   return '';
 }
 
-const NOTICES = ['kai-flow', 'app-notice'];
+const NOTICES = ['kai-flow', 'appnote'];
 function currentMode() {
   const now = Date.now();
   // a character scene (adhan, water, focus) owns the island until it ends or is closed
@@ -125,15 +125,12 @@ function render() {
     lastMode = mode;
   }
   const kaiNotice = mode === 'toast' && state.toast === 'kai-flow';
-  const appNoticeOn = mode === 'toast' && state.toast === 'app-notice';
   const sideHud = mode === 'toast' && (state.toast === 'vol' || state.toast === 'bright');
-  const changedToastSize = kaiNotice !== island.classList.contains('kai-notice') || appNoticeOn !== island.classList.contains('app-notice') || sideHud !== island.classList.contains('side-hud');
+  const changedToastSize = kaiNotice !== island.classList.contains('kai-notice') || sideHud !== island.classList.contains('side-hud');
   island.classList.toggle('kai-notice', kaiNotice);
-  island.classList.toggle('app-notice', appNoticeOn);
   island.classList.toggle('side-hud', sideHud);
   const noticeClose = $('#kai-notice-close');
-  const closable = kaiNotice || appNoticeOn;
-  if (noticeClose.hidden === closable) noticeClose.hidden = !closable;
+  if (noticeClose.hidden === kaiNotice) noticeClose.hidden = !kaiNotice;
   island.classList.toggle('kai-compact', state.features.kaiNoticeStyle === 'compact');
   island.classList.toggle('has-media', !!state.media.has);
   island.classList.toggle('playing', !!state.media.playing);
@@ -302,9 +299,7 @@ let anchor = { x: window.innerWidth / 2, y: 8, docked: false, vertical: false, s
 
 function positionIsland() {
   let [w, h] = (anchor.vertical ? VDIMS : DIMS)[lastMode] || DIMS.idle;
-  if (lastMode === 'toast' && state.toast === 'app-notice') {
-    [w, h] = [380, 74];
-  } else if (lastMode === 'toast' && state.toast === 'kai-flow') {
+  if (lastMode === 'toast' && state.toast === 'kai-flow') {
     [w, h] = state.features.kaiNoticeStyle === 'compact' ? [380, 74] : [420, 110];
   } else if (anchor.vertical && lastMode === 'toast' && !island.classList.contains('side-hud')) {
     [w, h] = [340, 76];
@@ -1292,12 +1287,13 @@ setInterval(() => {
       });
       if (!shown) showToast('done', `Focus ${focus.round} done`, `Break ${brk} min`, 0, 4500);
       celebrate(['#ff6b6b', '#ffd479', '#ff9f0a']);
-      playTones([[0, 784], [0.2, 988]], { peak: 0.2, decay: 0.6 });
+      const done = () => playTones([[0, 784], [0.2, 988]], { peak: 0.2, decay: 0.6 });
+      if (window.timerAlarm) window.timerAlarm(done); else done();
     } else {
       setTimer(state.features.focusMin || 25, null);
       island.classList.remove('focus-on', 'break-on');
-      showToast('done', 'Break over', 'Focus', 0, 9000, () => startPhase('focus'));
-      beep();
+      showToast('done', 'Break over', 'Focus', 0, window.timerAlarmMs || 9000, () => startPhase('focus'));
+      if (window.timerAlarm) window.timerAlarm(beep); else beep();
     }
     return;
   }
@@ -1305,10 +1301,8 @@ setInterval(() => {
     state.timer = { total: 0, remaining: 0, endAt: 0, running: false };
     $$('[data-min]').forEach((b) => b.classList.remove('sel'));
     drawTimer();
-    showToast('done', 'Timer Done', '', 0, 4000);
-    island.classList.add('alert');
-    setTimeout(() => island.classList.remove('alert'), 1000);
-    beep();
+    showToast('done', 'Timer Done', '', 0, window.timerAlarmMs || 4000);
+    if (window.timerAlarm) window.timerAlarm(beep); else beep();
   }
 }, 250);
 

@@ -1,6 +1,6 @@
 {
   "name": "nova-island",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "description": "A living island for your Windows desktop",
   "main": "nova.js",
   "scripts": {
@@ -46,6 +46,7 @@
       "!nova-island-plugins/**",
       "!local-plugins/**",
       "!tools/**",
+      "!upstream/**",
       "!scripts/**",
       "!news.json",
       "!build/appx/**",

@@ -602,7 +602,7 @@ static class Program {
 
   // Waits on a WinRT operation through its own Status/GetResults: the AsTask bridge would need
   // the Windows SDK's union Windows.winmd, which the compiler that ships with Windows lacks.
-  static T Await<T>(Windows.Foundation.IAsyncOperation<T> op, int ms = 3000) {
+  internal static T Await<T>(Windows.Foundation.IAsyncOperation<T> op, int ms = 3000) {
     if (op == null) return default(T);
     try {
       var until = DateTime.UtcNow.AddMilliseconds(ms);
@@ -621,19 +621,25 @@ static class Program {
   }
 
   static string Thumb(GlobalSystemMediaTransportControlsSessionMediaProperties props) {
-    if (props == null || props.Thumbnail == null) return "";
+    var bytes = props == null ? null : Bytes(props.Thumbnail);
+    return bytes == null ? "" : Convert.ToBase64String(bytes);
+  }
+
+  // whole content of a WinRT stream reference (media thumbnails, app logos), or null
+  internal static byte[] Bytes(IRandomAccessStreamReference source) {
+    if (source == null) return null;
     try {
-      using (var s = Await(props.Thumbnail.OpenReadAsync())) {
-        if (s == null || s.Size == 0) return "";
+      using (var s = Await(source.OpenReadAsync())) {
+        if (s == null || s.Size == 0) return null;
         var reader = new DataReader(s.GetInputStreamAt(0));
         uint n = Await(reader.LoadAsync((uint)s.Size));
-        if (n == 0) return "";
+        if (n == 0) return null;
         var bytes = new byte[n];
         reader.ReadBytes(bytes);
         reader.Dispose();
-        return Convert.ToBase64String(bytes);
+        return bytes;
       }
-    } catch { return ""; }
+    } catch { return null; }
   }
 
   static readonly Regex AppCmd = new Regex(@"^(pauseapp|playapp) (\S+)$");
@@ -743,6 +749,7 @@ static class Program {
       while ((line = stdin.ReadLine()) != null) {
         line = line.Trim();
         if (line == "meter on" || line == "meter off") AudioBands.SetEnabled(line == "meter on");
+        else if (line.StartsWith("appnotify ")) AppNotify.Command(line.Substring(10), outw);
         else if (line.StartsWith("strips ")) {
           // answered here, not on the command loop, so it does not also trigger a full status line
           var p = line.Split(' ');

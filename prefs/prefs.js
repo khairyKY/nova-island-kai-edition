@@ -524,3 +524,28 @@ api.onFeatures(showFeatures);
 api.onGeneral(showGeneral);
 api.features().then(showFeatures);
 api.general().then(showGeneral);
+
+// Settings > General: check for updates now; once one is downloaded, the button is "Update now"
+// and the island counts down and installs it, as its own card does
+const updBtn = $('#update-check');
+const UPDATE_TEXT = {
+  local: 'Off in this personal build', unavailable: 'Only the installed app updates', failed: 'Couldn’t check, try again later',
+};
+function showUpdate(s = {}) {
+  const ready = s.status === 'ready';
+  $('#update-status').textContent = ready ? `Version ${s.version} is ready`
+    : s.status === 'downloading' ? `Downloading version ${s.version || ''}…`
+    : s.status === 'latest' ? `Up to date · ${s.current}`
+    : UPDATE_TEXT[s.status] || (s.current ? `Version ${s.current}` : '');
+  updBtn.textContent = ready ? 'Update now' : 'Check now';
+  updBtn.dataset.ready = ready ? '1' : '';
+  updBtn.disabled = s.status === 'local' || s.status === 'unavailable';
+}
+updBtn.addEventListener('click', async () => {
+  if (updBtn.dataset.ready) return api.updateNow();
+  updBtn.disabled = true;
+  $('#update-status').textContent = 'Checking…';
+  showUpdate(await api.checkUpdate());
+});
+api.updateState().then(showUpdate);
+api.onUpdate((u) => showUpdate({ status: 'ready', version: u?.version }));

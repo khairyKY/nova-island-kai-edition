@@ -80,6 +80,27 @@ function setEnabled(on) {
   }, FIRST_CHECK_MS);
 }
 
+// Settings > General: what the updater is doing, and a check right now
+function state() {
+  if (LOCAL_BUILD) return { status: 'local' };
+  if (!updater) return { status: 'unavailable' }; // not the installed app
+  if (ready) return { status: 'ready', version: ready };
+  return { status: enabled ? 'idle' : 'off', current: app.getVersion() };
+}
+async function checkNow() {
+  if (LOCAL_BUILD || !updater || ready) return state();
+  try {
+    checkFailed = false;
+    const r = await updater.checkForUpdates();
+    // a found update downloads in the background; 'update-downloaded' then offers it
+    if (r?.isUpdateAvailable) return { status: 'downloading', version: r.updateInfo?.version };
+    return { status: 'latest', current: app.getVersion() };
+  } catch (err) {
+    logError('check failed', err);
+    return { status: 'failed' };
+  }
+}
+
 // restart into the downloaded version (silent install, then the app starts again)
 function install() {
   if (LOCAL_BUILD || !ready || !updater) return;
@@ -87,4 +108,4 @@ function install() {
   updater.quitAndInstall(true, true);
 }
 
-module.exports = { start, setEnabled, install, retrySoon };
+module.exports = { start, setEnabled, install, retrySoon, state, checkNow };

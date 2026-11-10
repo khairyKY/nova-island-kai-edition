@@ -8,7 +8,7 @@ const DEFAULTS = [
   'WhatsApp', 'Telegram', 'Spotify', 'Google Chrome', 'Visual Studio Code', 'Discord',
   'Microsoft Edge', 'File Explorer', 'Calculator', 'Notepad', 'Photos', 'Settings',
 ];
-const MAX_PINNED = 12; // 6 x 2 grid
+const MAX_PINNED = 36; // pages of 6 x 2 on the island (1.8.6)
 
 let catalog = settings.load('apps-cache.json', []);
 let pinned = settings.load('apps.json', null);

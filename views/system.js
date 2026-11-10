@@ -60,24 +60,81 @@
     $('#ram-val').title = `${(s.ramUsed / 2 ** 30).toFixed(1)} / ${(s.ramTotal / 2 ** 30).toFixed(1)} GB`;
   });
 
+  // Clipboard history (2.0): pinned clips first and kept, each clip one line; the full view shows
+  // a long or many-line clip whole, to read, copy or pin. Click a line to copy it, as in 1.x.
   const clipList = $('#clip-list');
+  const clipCard = clipList.closest('.clips');
+  const ICON_PIN = '<svg class="s" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
+  const ICON_OPEN = '<svg class="s" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';
+  const ICON_BACK = '<svg class="s" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>';
+  const ICON_COPY = '<svg class="s" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  // 1.x sent plain strings; 2.0 sends { text, pinned, long, chars }
+  const asClip = (c) => (typeof c === 'string' ? { text: c, pinned: false, long: c.length >= 300 || c.includes('\n'), chars: c.length } : c);
+  let clipsNow = [];
+
+  // the full view, over the list inside the same card
+  const full = document.createElement('div');
+  full.className = 'clip-full';
+  full.hidden = true;
+  full.innerHTML =
+    `<div class="clip-full-head"><button class="mini-btn" data-act="back" aria-label="Back to the list">${ICON_BACK}</button>` +
+    '<span class="clip-full-meta"></span>' +
+    `<button class="mini-btn" data-act="pin" aria-label="Pin">${ICON_PIN}</button>` +
+    `<button class="mini-btn" data-act="copy" aria-label="Copy">${ICON_COPY}</button></div>` +
+    '<div class="clip-full-text" dir="auto"></div>';
+  clipCard.append(full);
+  let fullAt = -1;
+  const closeFull = () => { full.hidden = true; fullAt = -1; clipCard.classList.remove('reading'); };
+  async function openFull(i) {
+    const c = clipsNow[i];
+    if (!c) return;
+    fullAt = i;
+    full.querySelector('.clip-full-text').textContent = c.text;
+    full.querySelector('.clip-full-meta').textContent = `${c.chars.toLocaleString('en-US')} characters`;
+    full.classList.toggle('pinned', !!c.pinned);
+    full.hidden = false;
+    clipCard.classList.add('reading');
+    const whole = await bridge.system.clipFull?.(i);
+    if (fullAt === i && typeof whole === 'string') full.querySelector('.clip-full-text').textContent = whole;
+  }
+  full.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'back') closeFull();
+    if (act === 'copy' && fullAt >= 0) { bridge.system.copyClip(fullAt); full.classList.add('copied'); setTimeout(() => full.classList.remove('copied'), 900); }
+    if (act === 'pin' && fullAt >= 0) { const c = clipsNow[fullAt]; bridge.system.pinClip?.(fullAt, !c.pinned); closeFull(); }
+  });
+
   function renderClips(clips) {
+    clipsNow = (clips || []).map(asClip);
+    if (!full.hidden) closeFull();
     clipList.innerHTML = '';
-    if (!clips.length) {
+    if (!clipsNow.length) {
       clipList.innerHTML = '<div class="clip-empty">Copied text shows up here</div>';
       return;
     }
-    clips.forEach((text, i) => {
+    clipsNow.forEach((c, i) => {
+      const row = document.createElement('div');
+      row.className = `clip-row${c.pinned ? ' pinned' : ''}`;
       const b = document.createElement('button');
       b.className = 'clip-item';
       b.dir = 'auto';
       b.title = 'Click to copy';
-      b.textContent = text.replace(/\s+/g, ' ').trim();
+      b.textContent = c.text.replace(/\s+/g, ' ').trim();
       b.addEventListener('click', () => {
         bridge.system.copyClip(i);
         b.classList.add('copied');
       });
-      clipList.append(b);
+      const tools = document.createElement('span');
+      tools.className = 'clip-tools';
+      if (c.long) tools.insertAdjacentHTML('beforeend', `<button class="mini-btn" data-act="open" aria-label="Show all" title="Show all">${ICON_OPEN}</button>`);
+      tools.insertAdjacentHTML('beforeend', `<button class="mini-btn pin" data-act="pin" aria-label="${c.pinned ? 'Unpin' : 'Pin'}" title="${c.pinned ? 'Unpin' : 'Pin'}">${ICON_PIN}</button>`);
+      tools.addEventListener('click', (e) => {
+        const act = e.target.closest('[data-act]')?.dataset.act;
+        if (act === 'open') openFull(i);
+        if (act === 'pin') bridge.system.pinClip?.(i, !c.pinned);
+      });
+      row.append(b, tools);
+      clipList.append(row);
     });
   }
   $('#clip-clear').addEventListener('click', () => bridge.system.clearClips());

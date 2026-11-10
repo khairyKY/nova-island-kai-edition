@@ -553,6 +553,8 @@ function startMedia() {
     mediaWrite(`privacy ${features.get().privacyDots ? 1 : 0}`);
     audioMeterOn = false;
     syncAudioMeter();
+    // Windows' own notifications, mirrored onto the island (the helper polls the notification list)
+    mediaWrite(features.get().appNotices !== false ? 'appnotify on' : 'appnotify off');
   });
   let buffer = '';
   media.on('error', (err) => {
@@ -578,6 +580,20 @@ function startMedia() {
         bridge.lastLine = Date.now();
         bridge.state = 'ok';
         if (data.error) console.error('[media]', data.error);
+        if ('appnote' in data) {
+          const n = data.appnote;
+          // some Store apps send unresolved resource names ("ms-resource:TimerDoneText"): drop those
+          const text = (s) => (/^ms-resource:/i.test(String(s || '')) ? '' : String(s || ''));
+          if (n && features.get().appNotices !== false && win && !win.isDestroyed() && !screenLocked) {
+            send('app-notice', { app: String(n.app || '').slice(0, 40), aumid: n.aumid ? String(n.aumid) : '', title: text(n.title).slice(0, 160),
+              body: text(n.body).slice(0, 360), icon: /^data:image\/png;base64,/.test(n.icon || '') ? n.icon : '', rgb: Array.isArray(n.rgb) ? n.rgb.slice(0, 3) : null });
+          }
+          continue;
+        }
+        if ('appnotifyAccess' in data) {
+          log.info(`[app-notify] notification access: ${data.appnotifyAccess}`);
+          continue;
+        }
         if ('strips' in data) {
           stripsWaiting.get(data.strips)?.(data);
           stripsWaiting.delete(data.strips);
@@ -1079,6 +1095,12 @@ function pollCursor() {
   setMouseCaptured(active && onPaint);
 }
 
+// Open on an app's notification: bring that app to the front (the helper finds or starts it)
+ipcMain.on('app-notify-open', (_e, aumid) => {
+  // app ids are letters, digits and . _ ! - { } \ and spaces; never a newline (the helper reads lines)
+  if (typeof aumid === 'string' && /^[\w.!{}\\ -]{1,260}$/.test(aumid)) mediaWrite(`appnotify open ${aumid}`);
+});
+
 // Text inputs (app search) need keyboard focus; the window is otherwise non-focusable.
 ipcMain.on('focus-input', (_e, on) => {
   if (!win) return;
@@ -1112,6 +1134,10 @@ ipcMain.on('shelf-drag', (e, p) => shelf.startDrag(e.sender, p));
 ipcMain.handle('system-snapshot', () => system.snapshot());
 ipcMain.on('clip-copy', (_e, i) => system.copyClip(i));
 ipcMain.on('clip-clear', () => system.clearClips());
+ipcMain.on('clip-pin', (_e, i, on) => { if (Number.isInteger(i)) system.pinClip(i, !!on); });
+ipcMain.handle('clip-full', (_e, i) => (Number.isInteger(i) ? system.clipFull(i) : null));
+// the reminder card's copy button: written quietly, so it stays out of the clipboard history
+ipcMain.on('copy-text', (_e, text) => { if (typeof text === 'string' && text) system.writeQuiet(text.slice(0, 10000)); });
 ipcMain.handle('prayer-snapshot', () => prayer.snapshot());
 
 // --- IDM Nova downloads ---
@@ -1261,6 +1287,10 @@ function openNovaLink(link) {
 // the island page reports once all its scripts ran (an early error would stop it before this)
 ipcMain.on('island-ready', () => log.info('island ready'));
 ipcMain.on('update-install', () => updater.install());
+// Settings > General: check now, and "Update now" (the island counts down, as its own card does)
+ipcMain.handle('update-check', () => updater.checkNow());
+ipcMain.handle('update-state', () => updater.state());
+ipcMain.on('update-now', () => send('update-now'));
 ipcMain.handle('features-get', () => settingsFeatures());
 ipcMain.on('kai-notice-preview', (_e, kind) => {
   if (!kaiPlugin?.notifications) return;
@@ -1391,6 +1421,7 @@ let autoUpdate = features.get().autoUpdate;
 let newsOn = features.get().news;
 features.onChange((f) => {
   appNotices.setEnabled(f.appNotices !== false);
+  mediaWrite(f.appNotices !== false ? 'appnotify on' : 'appnotify off');
   evalSaver();
   applyPerf();
   layout();
@@ -1416,7 +1447,7 @@ features.onChange((f) => {
     autoUpdate = f.autoUpdate;
     updater.setEnabled(autoUpdate);
   }
-  if (!f.clipboardHistory) system.clearClips();
+  if (!f.clipboardHistory) system.clearClips(true);
   updateVisibility();
 });
 
@@ -1498,7 +1529,8 @@ app.whenReady().then(() => {
   downloads.start(send, features.get().downloads, features.get().folderDownloads);
   privacy.start(send, features.get().privacyDots);
   network.start(send, features.get().netToasts);
-  updater.start(send, autoUpdate);
+  // Settings hears a ready update too, for its "Update now"
+  updater.start((ch, data) => { send(ch, data); prefsWindow.send(ch, data); }, autoUpdate);
   news.start(send, features.get().news);
   plugins.start((ch, data) => {
     if (ch === 'plugins') syncKaiPlugin(data);

@@ -38,7 +38,7 @@
   bridge.onVisibility(requestNext);
   $('#kai-notice-close').addEventListener('click', event => {
     event.stopPropagation();
-    if (lastMode !== 'toast' || !['kai-flow', 'app-notice'].includes(state.toast)) return;
+    if (lastMode !== 'toast' || state.toast !== 'kai-flow') return;
     state.hover = false;
     dismissToast();
   });

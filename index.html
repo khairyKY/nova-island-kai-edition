@@ -6,6 +6,7 @@
   <title>Nova Island</title>
   <link rel="stylesheet" href="themes.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style-2.css">
   <link rel="stylesheet" href="pressed-fern.css">
   <link rel="stylesheet" href="kai-glass.css">
   <link rel="stylesheet" href="phoenix.css">
@@ -117,7 +118,6 @@
       <!-- toast / HUD: battery, timer done, volume, brightness -->
       <div class="layer l-toast" aria-live="polite">
         <div class="side t-left">
-          <svg class="t-ico s ico-spark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></svg>
           <svg class="t-ico s ico-sprout" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21v-8M12 15C6 15 3 11 3 6c5 0 9 2 9 9ZM12 13c0-6 3-9 9-10 0 6-3 10-9 10ZM8 21h8"/></svg>
           <svg class="t-ico s ico-bolt" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
           <svg class="t-ico s ico-bell" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
@@ -155,7 +155,10 @@
       <div class="layer l-reminder" dir="rtl" lang="ar" aria-live="polite">
         <div class="rm-head">
           <span class="rm-badge"><svg class="s" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg><span id="rm-kind"></span></span>
-          <button class="rm-x" id="rm-close" aria-label="Close" title="Close"><svg class="s" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          <span class="rm-tools">
+            <button class="rm-x rm-copy" id="rm-copy" aria-label="Copy" title="Copy"><svg class="s" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
+            <button class="rm-x" id="rm-close" aria-label="Close" title="Close"><svg class="s" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </span>
         </div>
         <div class="rm-text" id="rm-text"></div>
         <div class="rm-ref" id="rm-ref"></div>
@@ -559,6 +562,17 @@
       </svg>
     </div>
 </div>
+    <!-- Pady's notices: a drop of the island's glass (views/pady-drop.js) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <filter id="goo" x="-10%" y="-30%" width="120%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
+      <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10"/>
+    </filter>
+  </svg>
+  <div class="pady-drop" id="pady-drop" aria-live="polite" hidden>
+    <div class="pd-goo"><span class="pd-body"></span><span class="pd-bead"></span></div>
+    <span class="pd-text">&#8203;</span>
+  </div>
     <!-- the card that stands beside the character -->
   <div class="scene-card" id="scene-card" dir="ltr" lang="en" aria-live="polite">
     <span class="sc-badge" id="sc-badge"></span>
@@ -574,6 +588,7 @@
   <script src="views/spotify.js"></script>
   <script src="views/kai-notices.js"></script>
 <script src="views/app-notices.js"></script>
+<script src="views/pady-drop.js"></script>
   <script src="views/apps.js"></script>
   <script src="views/shelf.js"></script>
   <script src="views/system.js"></script>
@@ -595,6 +610,8 @@
   <script src="views/nova.js"></script>
   <script src="views/scene.js"></script>
   <script src="views/water.js"></script>
+  <script src="views/timer-plus.js"></script>
+  <script src="views/reminders-copy.js"></script>
   <script src="views/ready.js"></script>
 </body>
 </html>

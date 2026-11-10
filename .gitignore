@@ -8,3 +8,6 @@ promo/src/prefs.html
 
 # local generation metadata (has local paths)
 assets/*/generation.json
+
+# extracted upstream builds for comparison (not part of this edition)
+upstream/

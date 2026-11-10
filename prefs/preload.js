@@ -44,4 +44,8 @@ contextBridge.exposeInMainWorld('prefs', {
   enablePlugin: (id, on) => ipcRenderer.send('plugin-enable', id, on),
   pluginSet: (id, key, value) => ipcRenderer.send('plugin-setting', id, key, value),
   onShowPage: on('show-page'),
+  updateState: () => ipcRenderer.invoke('update-state'),
+  checkUpdate: () => ipcRenderer.invoke('update-check'),
+  updateNow: () => ipcRenderer.send('update-now'),
+  onUpdate: on('update'),
 });

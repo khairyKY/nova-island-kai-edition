@@ -10,6 +10,7 @@ const DEFAULTS = {
   tabPrayer: true,
   tabTimer: true,
   tabSystem: true,
+  appsRunningFirst: true, // Apps tab: the open apps come first
   // idle pill slides
   slideClock: true,
   slideStats: true,

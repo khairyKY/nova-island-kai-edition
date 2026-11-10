@@ -1,6 +1,8 @@
-// Apps tab: pinned launcher grid. A click brings the app's open window to the front (or starts
-// it), a right-click opens a new window; a dot marks the apps that are open. Add opens the Start
-// menu picker; Edit enters edit mode where tiles can be removed (×) and dragged to a new position.
+// Apps tab (2.0's copy of views/apps.js): pinned launcher, up to 36 apps in pages of 6 x 2 that
+// slide sideways (drag, the mouse wheel, or the dots in the bar). A click brings the app's open
+// window to the front (or starts it), a right-click opens a new window; a dot marks the apps that
+// are open, and those come first unless "Open apps first" is off. Add opens the Start menu picker;
+// Edit shows the pinned order, where tiles can be removed (×) and dragged to a new position.
 (() => {
   const grid = $('#apps-grid');
   const picker = $('#apps-picker');
@@ -9,7 +11,11 @@
   const addBtn = $('#apps-add');
   const editBtn = $('#apps-edit');
   const hint = $('#apps-hint');
-  const MAX_PINNED = 12;
+  const MAX_PINNED = 36;
+  const PER_PAGE = 12;
+  const dots = document.createElement('span');
+  dots.className = 'apps-dots';
+  hint.after(dots);
   const SPRING = 'transform .32s cubic-bezier(.3, 1.3, .42, 1)';
 
   let pinned = [];
@@ -31,17 +37,54 @@
   }
 
   function setEditing(on) {
+    if (editing === on) return;
     editing = on;
-    grid.classList.toggle('editing', on);
-    updateBar();
+    renderGrid();
   }
 
+  // what the grid shows: the open apps first (not while editing, which shows the real order)
+  const shown = () => (editing || !feat('appsRunningFirst') ? pinned : [...pinned.filter((a) => running.has(a.id)), ...pinned.filter((a) => !running.has(a.id))]);
+  const pageCount = () => Math.max(1, Math.ceil(grid.querySelectorAll('.app').length / PER_PAGE));
+  const page = () => Math.round(grid.scrollLeft / Math.max(1, grid.clientWidth));
+  const goPage = (n, smooth = true) => grid.scrollTo({ left: Math.max(0, Math.min(pageCount() - 1, n)) * grid.clientWidth, behavior: smooth ? 'smooth' : 'instant' });
+
+  function renderDots() {
+    const n = pageCount();
+    dots.hidden = n < 2;
+    dots.innerHTML = '';
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement('button');
+      d.className = `dot${i === page() ? ' on' : ''}`;
+      d.setAttribute('aria-label', `Page ${i + 1}`);
+      d.addEventListener('click', () => goPage(i));
+      dots.append(d);
+    }
+  }
+  grid.addEventListener('scroll', () => dots.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('on', i === page())));
+  // the wheel turns the pages
+  let wheelAt = 0;
+  grid.addEventListener('wheel', (e) => {
+    if (pageCount() < 2) return;
+    e.preventDefault();
+    if (Date.now() - wheelAt < 350) return;
+    wheelAt = Date.now();
+    goPage(page() + (e.deltaY + e.deltaX > 0 ? 1 : -1));
+  }, { passive: false });
+
   function renderGrid() {
+    const at = page();
     grid.innerHTML = '';
+    grid.classList.add('paged');
     if (!pinned.length) {
       grid.innerHTML = '<div class="apps-empty">No apps yet. Use Add to pin your favourites.</div>';
     }
-    for (const a of pinned) {
+    let box = null;
+    shown().forEach((a, i) => {
+      if (i % PER_PAGE === 0) {
+        box = document.createElement('div');
+        box.className = 'apps-page';
+        grid.append(box);
+      }
       const b = document.createElement('button');
       b.className = `app${running.has(a.id) ? ' running' : ''}`;
       b.dataset.id = a.id;
@@ -66,10 +109,12 @@ Right-click for a new window`;
         bridge.apps.launch(a.id, true);
         setTimeout(refreshRunning, 1500);
       });
-      grid.append(b);
-    }
+      box.append(b);
+    });
     grid.classList.toggle('editing', editing);
     updateBar();
+    renderDots();
+    goPage(at, false);
   }
 
   // ---------- drag to reorder (edit mode) ----------
@@ -96,6 +141,12 @@ Right-click for a new window`;
       const r = t.getBoundingClientRect();
       return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
     });
+    // held at the left or right edge: the page beside it
+    const gr = grid.getBoundingClientRect();
+    if ((e.clientX < gr.left + 12 || e.clientX > gr.right - 12) && Date.now() - (drag.turned || 0) > 700) {
+      drag.turned = Date.now();
+      goPage(page() + (e.clientX < gr.left + 12 ? -1 : 1));
+    }
     if (!target) return;
 
     // FLIP: remember where everything was, move the tile in the DOM, animate the others
@@ -103,7 +154,7 @@ Right-click for a new window`;
     const first = new Map(others.map((t) => [t, t.getBoundingClientRect()]));
     const before = { x: el.offsetLeft, y: el.offsetTop };
     const forward = tiles.indexOf(el) < tiles.indexOf(target);
-    grid.insertBefore(el, forward ? target.nextSibling : target);
+    target.parentNode.insertBefore(el, forward ? target.nextSibling : target);
     drag.sx += el.offsetLeft - before.x;
     drag.sy += el.offsetTop - before.y;
     el.style.transform = `translate(${e.clientX - drag.sx}px, ${e.clientY - drag.sy}px)`;
@@ -134,6 +185,7 @@ Right-click for a new window`;
     const ids = [...grid.querySelectorAll('.app')].map((t) => t.dataset.id);
     pinned = ids.map((id) => pinned.find((p) => p.id === id)).filter(Boolean);
     bridge.apps.reorder(ids);
+    renderGrid(); // pages of 12 again
   }
   grid.addEventListener('pointerup', endDrag);
   grid.addEventListener('pointercancel', endDrag);
@@ -200,7 +252,8 @@ Right-click for a new window`;
     const ids = new Set(await bridge.apps.running());
     if ([...ids].sort().join('|') === [...running].sort().join('|')) return;
     running = ids;
-    grid.querySelectorAll('.app').forEach((el) => el.classList.toggle('running', running.has(el.dataset.id)));
+    // the open apps move to the front
+    if (!drag) renderGrid();
   }
   window.addEventListener('island:mode', (e) => { if (e.detail.mode === 'expanded') refreshRunning(); });
   $('.tab[data-tab="apps"]').addEventListener('click', refreshRunning);
