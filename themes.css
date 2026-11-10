@@ -20,7 +20,7 @@
 }
 [data-theme="kai-night"] {
   --th-glass: 1;
-  --th-tint: rgba(38, 34, 51, .64); --th-tint-strong: rgba(38, 34, 51, .82);
+  --th-tint: rgba(38, 34, 51, .84); --th-tint-strong: rgba(38, 34, 51, .92);
   --th-solid: #262233;
   --th-bg: #262233;
   --th-deco: radial-gradient(80% 120% at 100% 100%, #c0b7e030, transparent 65%);
@@ -41,7 +41,7 @@
 }
 [data-theme="kai-fern-night"] {
   --th-glass: 1;
-  --th-tint: rgba(38, 34, 51, .64); --th-tint-strong: rgba(38, 34, 51, .82);
+  --th-tint: rgba(38, 34, 51, .84); --th-tint-strong: rgba(38, 34, 51, .92);
   --th-solid: #262233;
   --th-bg: #262233;
   --th-deco: radial-gradient(ellipse at 47% 20%, transparent 39%, #323749a6 155%);
