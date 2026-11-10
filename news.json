@@ -1,5 +1,23 @@
 [
   {
+    "id": "widgets-update-185",
+    "type": "update",
+    "title": "New: desktop widgets in Nova Island 1.8.5",
+    "body": "The next prayer, the date and a focus timer as glass widgets on your desktop. Click to get the update.",
+    "link": "https://github.com/NOVA-TECH-KIT/nova-island/releases/latest",
+    "maxVersion": "1.8.4",
+    "sig": "hO8o//ksmCH9snFmtsNp0vrARvjlN2+PsuSXjLiGT3ZKnPNLwN5ggfJnNXBxtI90yAYNTwHgsATDdypHGtXBAg=="
+  },
+  {
+    "id": "desktop-widgets",
+    "type": "news",
+    "title": "Desktop widgets are here",
+    "body": "Put the next prayer, the date, a focus timer and more on your desktop. Click to choose your widgets.",
+    "link": "nova://settings/widgets",
+    "minVersion": "1.8.5",
+    "sig": "FRVZ+X6pRdAyvJECX9G87hYIGpieNLo2KZfcxDhIVD/hWuzowP3XDsmJdQ804M0KA6YKALqTutuXvAoayzLdDQ=="
+  },
+  {
     "id": "qr-nova-launch",
     "type": "news",
     "title": "New from Nova: QR Nova",
