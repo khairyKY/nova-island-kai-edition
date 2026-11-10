@@ -8,6 +8,48 @@
      --th-deco    one still image over the surface (gradients only)
      --th-text    the main text, --th-soft the secondary text, --th-hi the highlight
      --th-solid   a glass theme's own look without glass (while a screen recorder runs) */
+[data-theme="kai-day"] {
+  /* solid: the paper tint hid the glass anyway, and solid skips the screen sampling */
+  --th-tint: rgba(251, 246, 233, .78); --th-tint-strong: rgba(251, 246, 233, .9);
+  --th-solid: #fbf6e9;
+  --th-bg: #fbf6e9;
+  --th-deco: radial-gradient(75% 120% at 100% 100%, #8a9a7e38, transparent 65%);
+  --th-line: #8a9a7e99; --th-line-w: 1px;
+  --th-text: #2a2420; --th-soft: #5f5849; --th-hi: #4d6650;
+  --th-prev: #d8dfcc;
+}
+[data-theme="kai-night"] {
+  --th-glass: 1;
+  --th-tint: rgba(38, 34, 51, .64); --th-tint-strong: rgba(38, 34, 51, .82);
+  --th-solid: #262233;
+  --th-bg: #262233;
+  --th-deco: radial-gradient(80% 120% at 100% 100%, #c0b7e030, transparent 65%);
+  --th-line: #c0b7e04d; --th-line-w: 1px;
+  --th-text: #f0ebdd; --th-soft: #c9c0d8; --th-hi: #e4c36b;
+  --th-prev: #211d30;
+}
+[data-theme="kai-fern-day"] {
+  /* solid: the paper tint hid the glass anyway, and solid skips the screen sampling */
+  --th-tint: rgba(251, 246, 233, .78); --th-tint-strong: rgba(251, 246, 233, .9);
+  --th-solid: #fbf6e9;
+  --th-bg: #fbf6e9;
+  --th-deco: radial-gradient(ellipse at 47% 20%, transparent 39%, #ede6d3a6 155%);
+  --th-line: #4d66503d; --th-line-w: 1px;
+  --th-text: #2a2420; --th-soft: #5f5849; --th-hi: #4d6650;
+  --th-prev: #e8e5d8;
+  --fern-leaf: #54744e;
+}
+[data-theme="kai-fern-night"] {
+  --th-glass: 1;
+  --th-tint: rgba(38, 34, 51, .64); --th-tint-strong: rgba(38, 34, 51, .82);
+  --th-solid: #262233;
+  --th-bg: #262233;
+  --th-deco: radial-gradient(ellipse at 47% 20%, transparent 39%, #323749a6 155%);
+  --th-line: #c6d8ba3d; --th-line-w: 1px;
+  --th-text: #f0ebdd; --th-soft: #c9c0d8; --th-hi: #c6d8ba;
+  --th-prev: #211d30;
+  --fern-leaf: #a8c09a;
+}
 [data-theme="original"] {
   --th-glass: 1;
   --th-tint: rgba(14, 14, 20, .52); --th-tint-strong: rgba(10, 10, 16, .64);

@@ -13,6 +13,7 @@ const MAX_PINNED = 12; // 6 x 2 grid
 let catalog = settings.load('apps-cache.json', []);
 let pinned = settings.load('apps.json', null);
 const iconCache = new Map();
+const sourceCache = new Map(); // media appId -> catalog entry (or null)
 let onChange = () => {};
 
 function scriptPath(name) {
@@ -39,6 +40,8 @@ function scanOnce() {
         const items = (Array.isArray(list) ? list : [list]).filter((a) => a && a.name && a.id);
         if (!items.length) throw new Error('empty list');
         catalog = items.sort((a, b) => a.name.localeCompare(b.name));
+        iconCache.clear();
+        sourceCache.clear();
         settings.save('apps-cache.json', catalog);
         resolve(true);
       } catch (err) {
@@ -68,19 +71,23 @@ function pickDefaults() {
 }
 
 async function iconFor(entry) {
-  if (!entry || !entry.icon) return '';
-  if (iconCache.has(entry.id)) return iconCache.get(entry.id);
+  if (!entry || (!entry.icon && !entry.image)) return '';
+  if (iconCache.has(entry)) return iconCache.get(entry);
   let url = '';
   try {
-    if (entry.kind === 'png') {
+    if (entry.image) {
+      const img = nativeImage.createFromDataURL(entry.image);
+      if (!img.isEmpty()) url = img.toDataURL();
+    }
+    if (!url && entry.kind === 'png') {
       const img = nativeImage.createFromPath(entry.icon);
       if (!img.isEmpty()) url = img.resize({ width: 64, height: 64, quality: 'best' }).toDataURL();
-    } else {
+    } else if (!url && entry.icon) {
       const img = await app.getFileIcon(entry.icon, { size: 'large' });
       if (!img.isEmpty()) url = img.toDataURL();
     }
   } catch {}
-  iconCache.set(entry.id, url);
+  iconCache.set(entry, url); // failures too, so getFileIcon isn't retried every list()
   return url;
 }
 
@@ -195,4 +202,11 @@ async function init(changed) {
   persist();
 }
 
-module.exports = { init, list, all, add, remove, reorder, launch, running, setHelper, onHelper, MAX_PINNED };
+function mediaSource(appId) {
+  const id = String(appId || '').toLowerCase();
+  if (!sourceCache.has(id)) sourceCache.set(id, catalog.find(a => a.id.toLowerCase() === id || (id.endsWith('.exe') && String(a.icon || '').toLowerCase().endsWith('\\' + id))) || null);
+  const entry = sourceCache.get(id);
+  const icon = entry && (entry.image || iconCache.get(entry));
+  return icon ? {id:'app',name:entry.name,icon,vector:false} : null;
+}
+module.exports = { init, list, all, add, remove, reorder, launch, running, setHelper, onHelper, mediaSource, MAX_PINNED };

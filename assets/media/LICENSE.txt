@@ -1,0 +1,5 @@
+Source logos are from Simple Icons, released under CC0-1.0.
+https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md
+Version 13.0.0, except Microsoft Edge from version 11.0.0.
+Brand names and marks belong to their respective owners.
+media.svg is a local generic music glyph.

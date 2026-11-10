@@ -50,4 +50,4 @@ ipcMain.on('prefs-window', (e, action) => {
   else if (action === 'minimize') w.minimize();
 });
 
-module.exports = { open, send };
+module.exports = { open, send, owns: contents => !!win && !win.isDestroyed() && win.webContents === contents };

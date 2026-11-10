@@ -16,9 +16,9 @@ function canonical(v) {
   return JSON.stringify(v);
 }
 
-function verify(obj, sig) {
+function verify(obj, sig, key = PUBLIC_KEY) {
   try {
-    return typeof sig === 'string' && crypto.verify(null, Buffer.from(canonical(obj)), PUBLIC_KEY, Buffer.from(sig, 'base64'));
+    return typeof sig === 'string' && crypto.verify(null, Buffer.from(canonical(obj)), key, Buffer.from(sig, 'base64'));
   } catch {
     return false;
   }

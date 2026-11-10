@@ -42,7 +42,7 @@
       ? `Daily goal reached (${g} glasses) 🎉 — one more won't hurt`
       : `<b>${n}</b> of ${g} glasses today`;
     return playScene({
-      who: 'drop', props: ['glass'], arms: 'hold', tone: 'water', badge: '💧 Water',
+      who: 'drop', phoenixPose:'water-reminder', props: ['glass'], arms: 'hold', tone: 'water', badge: '💧 Water',
       title: 'Drink a glass of water', sub, ms: 20000,
       button: { label: 'I drank ✓', onClick: drank },
       onClose: () => { activeMs = Math.max(0, everyMs() - SNOOZE_MS); },
@@ -53,7 +53,10 @@
     const n = load() + 1;
     save(n);
     const g = goal();
-    showToast('done', n >= g ? 'Water goal reached!' : 'Glass of water ✓', `${n} / ${g}`, 0, 2400);
+    const shown = window.phoenix?.enabled('drinking') || (n === g && window.phoenix?.enabled('celebration'))
+      ? playScene({who:'nova',phoenixPose:'drinking',phoenixSequence:n===g?[{pose:'celebration',at:2500}]:[],tone:'water',badge:'💧 Water',
+        title:n>=g?'Water goal reached!':'Glass of water ✓',sub:`<b>${n}</b> of ${g} glasses today`,ms:n===g?5000:3000}) : false;
+    if(!shown)showToast('done', n >= g ? 'Water goal reached!' : 'Glass of water ✓', `${n} / ${g}`, 0, 2400);
     if (n === g) celebrate(['#38bdf8', '#a5f3fc', '#ffd479']);
   }
   window.logWater = drank;

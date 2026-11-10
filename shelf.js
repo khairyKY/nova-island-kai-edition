@@ -12,6 +12,7 @@ let items = settings.load('shelf.json', [])
   .map((x) => (typeof x === 'string' ? { path: x } : x))
   .filter((x) => x && typeof x.path === 'string' && fs.existsSync(x.path));
 const icons = new Map();
+const previews = new Map();
 let onExpire = () => {};
 
 async function iconFor(p) {
@@ -27,17 +28,52 @@ async function iconFor(p) {
 
 const has = (p) => items.some((x) => x.path === p);
 
+async function previewFor(p) {
+  if (!/\.(png|jpe?g|webp|bmp|gif|tiff?|avif)$/i.test(p)) return '';
+  try {
+    const stat = fs.statSync(p);
+    const stamp = stat.mtimeMs + ':' + stat.size;
+    const cached = previews.get(p);
+    if (cached?.stamp === stamp) return cached.promise;
+    const request = { stamp, promise: null };
+    request.promise = nativeImage.createThumbnailFromPath(p, { width: 244, height: 144 })
+      .then((image) => {
+        if (!image.isEmpty()) return image.toDataURL();
+        if (previews.get(p) === request) previews.delete(p);
+        return '';
+      })
+      .catch(() => {
+        if (previews.get(p) === request) previews.delete(p);
+        return '';
+      });
+    previews.set(p, request);
+    return request.promise;
+  } catch { return ''; }
+}
+
+function pruneCaches() {
+  const paths = new Set(items.map((item) => item.path));
+  for (const cache of [icons, previews]) {
+    for (const p of cache.keys()) if (!paths.has(p)) cache.delete(p);
+  }
+}
+
 async function list() {
-  items = items.filter((x) => fs.existsSync(x.path));
-  return Promise.all(
-    items.map(async ({ path: p, until }) => {
-      const img = await iconFor(p);
-      return { path: p, name: path.basename(p) || p, icon: img.isEmpty() ? '' : img.toDataURL(), until: until || 0 };
+  const existing = items.filter((x) => fs.existsSync(x.path));
+  if (existing.length !== items.length) items = existing;
+  pruneCaches();
+  const snapshot = items;
+  const files = await Promise.all(
+    snapshot.map(async ({ path: p, until }) => {
+      const [img, preview] = await Promise.all([iconFor(p), previewFor(p)]);
+      return { path: p, name: path.basename(p) || p, icon: img.isEmpty() ? '' : img.toDataURL(), preview, until: until || 0 };
     })
   );
+  return snapshot === items ? files : list();
 }
 
 function save() {
+  pruneCaches();
   settings.save('shelf.json', items);
 }
 

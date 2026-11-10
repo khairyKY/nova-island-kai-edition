@@ -6,6 +6,7 @@
   <title>Nova Island Settings</title>
   <link rel="stylesheet" href="../themes.css">
   <link rel="stylesheet" href="prefs.css">
+  <link rel="stylesheet" href="../pressed-fern.css">
 </head>
 <body>
   <header class="titlebar">
@@ -66,8 +67,11 @@
               </div>
             </div>
             <label class="row"><b>Hide in full screen</b><input type="checkbox" class="sw" data-feature="hideFullscreen"></label>
-            <label class="row" id="update-row"><b>Auto-update</b><input type="checkbox" class="sw" data-feature="autoUpdate"></label>
+            <label class="row" id="update-row"><div class="txt"><b>Auto-update</b><small id="local-update-note" hidden></small></div><input type="checkbox" class="sw" data-feature="autoUpdate"></label>
             <div class="row"><b>Position</b><button class="btn" data-general-action="resetPosition">Reset</button></div>
+            <div class="row"><div class="txt"><b>Island scale</b><small>Resize text, controls and panels; fits the display and browser toolbar.</small></div>
+              <div class="stepper" data-num="islandScale" data-steps="80,90,100,110,125,150,175,200" data-unit="%"><button data-dir="-1" aria-label="Smaller island">−</button><output></output><button data-dir="1" aria-label="Larger island">+</button></div>
+            </div>
           </div>
         </div>
         <div class="group">
@@ -126,6 +130,20 @@
             <label class="row"><b>New track card</b><input type="checkbox" class="sw" data-feature="trackPeek"></label>
           </div>
         </div>
+        <div class="group">
+          <h2>Spotify</h2>
+          <div class="card">
+            <div class="row"><div class="txt"><b>Liked Songs</b><small id="spotify-status">Checking connection…</small></div><button class="btn" id="spotify-disconnect" hidden>Disconnect</button></div>
+            <div class="row field"><input id="spotify-client-id" type="text" placeholder="Spotify Client ID" aria-label="Spotify Client ID" spellcheck="false" autocomplete="off" maxlength="32"><button class="btn" id="spotify-connect">Connect Spotify</button></div>
+            <div class="row"><div class="txt"><small>Add this redirect URL to your personal Spotify app:</small><code id="spotify-redirect">http://127.0.0.1:8989/login</code></div><button class="btn" id="spotify-dashboard">Developer dashboard</button></div>
+          </div>
+          <p class="hint">Connect once to save the current Spotify song from the island. Personal development apps require a Premium owner. No client secret is needed.</p>
+        </div>
+        <div class="group">
+          <h2>Browser media sources</h2>
+          <div class="card"><div class="row"><div class="txt"><b>Media companion</b><small id="browser-companion-status">Checking connection…</small></div><button class="btn" id="browser-companion-folder">Open extension folder</button></div></div>
+          <p class="hint">In Opera GX, Chrome or Edge, open Extensions, turn on Developer mode and choose Load unpacked. Select the folder above. This identifies playing sites without switching tabs.</p>
+        </div>
       </section>
 
       <!-- THEMES -->
@@ -141,17 +159,30 @@
       <section id="companion" class="page">
         <h1>Companion</h1>
         <div class="group">
-          <h2>Nova</h2>
+          <h2>Character</h2>
+          <div class="card"><div class="row companion-style-row"><b>Companion</b><div class="seg" role="radiogroup" aria-label="Companion character">
+            <button role="radio" data-companion-style="phoenix">Phoenix</button><button role="radio" data-companion-style="zaher-seated">Zaher seated</button><button role="radio" data-companion-style="zaher-standing">Zaher standing</button><button role="radio" data-companion-style="classic">Classic Nova</button><button role="radio" data-companion-style="none">Hidden</button>
+          </div></div></div>
+          <p class="hint">Hiding a character or a pose keeps the reminder and its controls active.</p>
+        </div>
+        <div class="group" id="phoenix-settings">
+          <h2 id="companion-state-heading">Phoenix states</h2>
+          <div class="card" id="phoenix-options"></div>
+          <p class="hint">Each pose has its own switch. Preview shows the artwork briefly without changing your switches. Blinking pauses when animations are off.</p>
+          <p class="hint" id="zaher-standing-hint" hidden>Zaher stands when idle and uses the compact poses for reminders. Choose Zaher seated for blinking and cursor reactions.</p>
+        </div>
+        <div class="group" id="classic-companion-settings">
+          <h2>Classic Nova</h2>
           <div class="card">
             <label class="row"><b>Eyes</b><input type="checkbox" class="sw" data-feature="novaEyes"></label>
             <label class="row"><b>At the adhan</b><input type="checkbox" class="sw" data-feature="novaPrayer"></label>
             <label class="row"><b>Focus sessions</b><input type="checkbox" class="sw" data-feature="novaFocus"></label>
-            <label class="row"><b>Celebrations</b><input type="checkbox" class="sw" data-feature="celebrate"></label>
           </div>
         </div>
         <div class="group">
           <h2>Moments</h2>
           <div class="card">
+            <label class="row"><b>Celebration effects</b><input type="checkbox" class="sw" data-feature="celebrate"></label>
             <label class="row"><b>Morning brief</b><input type="checkbox" class="sw" data-feature="morningBrief"></label>
             <label class="row"><b>Welcome back</b><input type="checkbox" class="sw" data-feature="welcomeBack"></label>
             <label class="row"><b>Break reminders</b><input type="checkbox" class="sw" data-feature="wellbeing"></label>
@@ -214,6 +245,29 @@
       <!-- ALERTS & PRIVACY -->
       <section id="alerts" class="page">
         <h1>Alerts &amp; Privacy</h1>
+        <div class="group" id="kai-notice-settings" hidden>
+          <h2>Kai’s Flow desktop alerts</h2>
+          <div class="card">
+            <div class="row"><div class="txt"><b>Notification style</b><small>Uses the island’s botanical palette</small></div>
+              <div class="seg" role="radiogroup" aria-label="Kai’s Flow notification style">
+                <button role="radio" data-kai-style="card">Card</button>
+                <button role="radio" data-kai-style="compact">Compact</button>
+              </div>
+            </div>
+            <div class="row"><b>Show for</b>
+              <div class="stepper" data-num="kaiNoticeSeconds" data-steps="3,4,6,8,10,15,20,30" data-unit="s"><button data-dir="-1" aria-label="Shorter notification">−</button><output></output><button data-dir="1" aria-label="Longer notification">+</button></div>
+            </div>
+            <label class="row"><div class="txt"><b>Task reminders</b><small>Individual and grouped task reminders</small></div><input type="checkbox" class="sw" data-feature="kaiTaskReminders"></label>
+            <label class="row"><b>Focus completion</b><input type="checkbox" class="sw" data-feature="kaiFocusDone"></label>
+            <label class="row"><b>Test notifications</b><input type="checkbox" class="sw" data-feature="kaiTestNotices"></label>
+            <div class="row"><small>Enable Kai’s Flow notifications in Plugins to receive and preview these alerts.</small></div>
+          </div>
+          <div class="actions">
+            <button class="btn" data-kai-preview="task_reminder">Preview reminder</button>
+            <button class="btn" data-kai-preview="focus_done">Preview focus</button>
+            <button class="btn" data-kai-preview="test">Preview test</button>
+          </div>
+        </div>
         <div class="group">
           <h2>Alerts</h2>
           <div class="card">
@@ -339,6 +393,7 @@
     </main>
   </div>
   <div class="saved" id="saved" role="status">Saved</div>
+  <script src="../phoenix-states.js"></script>
   <script src="prefs.js"></script>
 </body>
 </html>

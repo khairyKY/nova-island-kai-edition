@@ -85,7 +85,8 @@
     if (!state.visible || lastMode === 'expanded' || cardShowing() || window.sceneShowing?.() || (state.toast && now < state.toastUntil)) return;
     const c = pending;
     pending = null;
-    showCard(c);
+    const pose = c.kind === 'care' ? (c.html.includes('Rest your eyes') ? 'resting' : 'break') : 'welcome';
+    if(!window.phoenix?.showMoment(c,pose))showCard(c);
   }
   setInterval(flush, 1000);
 

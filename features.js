@@ -1,5 +1,6 @@
 // Which parts of the island are on. Edited in the Settings window, applied live by the island.
 const settings = require('./settings');
+const PHOENIX_STATES = require('./phoenix-states');
 
 const DEFAULTS = {
   // expanded tabs
@@ -32,16 +33,22 @@ const DEFAULTS = {
   folderDownloads: true, // browser downloads, seen in the download folders
   // window
   hideFullscreen: true,
-  autoUpdate: true, // download new versions from GitHub and offer a restart on the island
+  autoUpdate: true, // from this edition's own GitHub releases (package.json publish), never the original's
   addrIsland: true, // take the right third of the browser's address bar; off: stay in place, clicks pass through
+  islandScale: 100,
+  kaiTaskReminders: true,
+  kaiFocusDone: true,
+  kaiTestNotices: true,
+  kaiNoticeStyle: 'card',
+  kaiNoticeSeconds: 8,
   // performance (the battery saver turns all three on while the battery is low)
   noBlur: false, // solid island, no screen capture at all
   noAnimations: false,
-  glassFreeze: false, // capture the screen only while the island is open
+  glassFreeze: true, // refresh the glass on opening and moving, not while it sits closed
   batterySaver: false,
   batterySaverAt: 20, // percent
   news: true, // plugins, updates and news from the Nova team (news.json on GitHub)
-  theme: 'original', // the island's look (themes.css)
+  theme: 'kai-fern-day', // falls back to Original when the Kai plugin is off
   // System tab
   clipboardHistory: true,
   // copied image / screenshot -> toast; on the Shelf by itself for a while, or "Add to Shelf"
@@ -51,6 +58,8 @@ const DEFAULTS = {
   // mic / camera in use
   privacyDots: true,
   // companion
+  companionStyle: 'phoenix',
+  ...Object.fromEntries(PHOENIX_STATES.map(({key}) => [key,true])),
   netToasts: true,
   welcomeBack: true,
   morningBrief: true,
@@ -87,23 +96,31 @@ const RANGES = {
   remindEvery: [1, 240], remindFor: [5, 300], quietFrom: [0, 1439], quietTo: [0, 1439],
   focusMin: [5, 120], breakMin: [1, 60], longBreakMin: [5, 60], hijriAdjust: [-2, 2], waterEvery: [15, 240], waterGoal: [4, 16], shotShelfMinutes: [5, 1440],
   batterySaverAt: [10, 100],
+  islandScale: [80, 200],
+  kaiNoticeSeconds: [3, 30],
 };
 
 // settings that are one of a fixed list
 const CHOICES = {
-  theme: ['original', 'bakka', 'outline', 'midnight', 'forest', 'snow', 'cat', 'galaxy', 'aurora', 'ocean', 'nody', 'lava', 'retro'],
+  companionStyle: ['phoenix', 'zaher-seated', 'zaher-standing', 'classic', 'none'],
+  kaiNoticeStyle: ['card', 'compact'],
+  theme: ['kai-day', 'kai-night', 'kai-fern-day', 'kai-fern-night', 'original', 'bakka', 'outline', 'midnight', 'forest', 'snow', 'cat', 'galaxy', 'aurora', 'ocean', 'nody', 'lava', 'retro'],
 };
 // themes without glass: no screen capture behind them
-const SOLID_THEMES = ['bakka', 'midnight', 'forest', 'cat', 'galaxy', 'aurora', 'ocean', 'nody', 'lava', 'retro'];
+const SOLID_THEMES = ['kai-day', 'kai-fern-day', 'bakka', 'midnight', 'forest', 'cat', 'galaxy', 'aurora', 'ocean', 'nody', 'lava', 'retro'];
 
-let values = { ...DEFAULTS, ...pick(settings.load('features.json', {})) };
+const saved = settings.load('features.json', {});
+// the second companion was renamed from Sherman to Zaher
+if (typeof saved?.companionStyle === 'string') saved.companionStyle = saved.companionStyle.replace(/^sherman-/, 'zaher-');
+const newerSettings = Object.fromEntries(Object.entries(saved || {}).filter(([key]) => !Object.hasOwn(DEFAULTS, key)));
+let values = { ...DEFAULTS, ...pick(saved) };
 const listeners = [];
 
 // keep only known keys with values of the right type (numbers clamped to their range)
 function pick(obj) {
   const out = {};
   for (const [k, v] of Object.entries(obj || {})) {
-    if (!(k in DEFAULTS)) continue;
+    if (!Object.hasOwn(DEFAULTS, k)) continue;
     if (CHOICES[k]) {
       if (CHOICES[k].includes(v)) out[k] = v;
     } else if (RANGES[k]) {
@@ -121,14 +138,14 @@ function set(patch) {
   const clean = pick(patch);
   if (!Object.keys(clean).length) return values;
   values = { ...values, ...clean };
-  settings.save('features.json', values);
+  settings.save('features.json', { ...newerSettings, ...values });
   listeners.forEach((fn) => fn(get()));
   return get();
 }
 
 function reset() {
   values = { ...DEFAULTS };
-  settings.save('features.json', values);
+  settings.save('features.json', { ...newerSettings, ...values });
   listeners.forEach((fn) => fn(get()));
 }
 

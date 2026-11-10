@@ -2,8 +2,7 @@
 // plugin catalog on GitHub (NOVA-TECH-KIT/nova-island-plugins), its install counts from the release
 // downloads there (no tracking of anyone). A plugin is one signed file (.nvp); a changed or
 // foreign file is refused, from the catalog or from a file on disk alike.
-// Plugins hold content only, no code: the island itself does the work for each kind. The first
-// kind is "radio": live Qur'an stations the island plays.
+// Plugins hold content only. The island implements each supported kind.
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -18,6 +17,9 @@ const ASSET_URL = /^https:\/\/github\.com\/NOVA-TECH-KIT\/nova-island-plugins\/r
 const CATALOG_MS = 6 * 60 * 60 * 1000;
 const MAX_BYTES = 2 * 1024 * 1024;
 const ID = /^[a-z0-9-]{2,40}$/;
+const KAI_PLUGIN_ID = 'kais-flow';
+const KAI_KIND = 'kai-flow';
+const KAI_KEY = crypto.createPublicKey(fs.readFileSync(path.join(__dirname, 'kai-plugin-public.pem')));
 // the hosts a radio plugin may stream from (the island's page allows exactly these, too)
 const RADIO_URL = /^https:\/\/([\w-]+\.radiojar\.com|([\w-]+\.)?qurango\.net)\/[\w./?=&-]+$/;
 
@@ -43,7 +45,7 @@ function checkRadio(m) {
   }
   return { stations };
 }
-const KINDS = { radio: checkRadio };
+const KINDS = { radio: checkRadio, [KAI_KIND]: () => ({}) };
 
 function checkSettings(list) {
   const out = [];
@@ -59,8 +61,10 @@ function checkSettings(list) {
 // a bundle is { manifest, sig }; returns the clean manifest, or null
 function checkBundle(bundle) {
   const m = bundle?.manifest;
-  if (!m || !signing.verify(m, bundle.sig)) return null;
-  if (!ID.test(m.id || '') || !/^\d+\.\d+\.\d+$/.test(m.version || '') || !KINDS[m.kind]) return null;
+  if (!m || !ID.test(m.id || '') || !/^\d+\.\d+\.\d+$/.test(m.version || '') || !Object.hasOwn(KINDS, m.kind)) return null;
+  // The local key can authorize only the Kai plugin. The catalog and all other kinds use Nova's key.
+  const kai = m.kind === KAI_KIND;
+  if (kai !== (m.id === KAI_PLUGIN_ID) || !signing.verify(m, bundle.sig, kai ? KAI_KEY : undefined)) return null;
   const content = KINDS[m.kind](m);
   if (!content) return null;
   return {
@@ -131,7 +135,7 @@ function changed() {
 // ---------- the catalog ----------
 function cleanCatalog(list) {
   return (Array.isArray(list) ? list : [])
-    .filter((p) => ID.test(p?.id || '') && ASSET_URL.test(p.url || '') && /^\d+\.\d+\.\d+$/.test(p.version || '') && p.price === 'free')
+    .filter((p) => ID.test(p?.id || '') && p.id !== KAI_PLUGIN_ID && ASSET_URL.test(p.url || '') && /^\d+\.\d+\.\d+$/.test(p.version || '') && p.price === 'free')
     .map((p) => ({
       id: p.id, name: text(p.name, 40), description: text(p.description, 160), version: p.version,
       size: Number(p.size) || 0, price: 'free', url: p.url, sha256: /^[a-f0-9]{64}$/.test(p.sha256 || '') ? p.sha256 : '',
@@ -224,7 +228,7 @@ function installFile(file) {
     if (fs.statSync(file).size > MAX_BYTES) return { ok: false, error: 'This file is too big for a plugin' };
     const bundle = JSON.parse(fs.readFileSync(file, 'utf8'));
     const m = checkBundle(bundle);
-    if (!m) return { ok: false, error: "This plugin isn't signed by Nova Island, so it can't be installed" };
+    if (!m) return { ok: false, error: 'This plugin’s signature is not trusted by this Nova Island build' };
     save(bundle, m);
     progress(m.id, { pct: 1, done: true, name: m.name });
     changed();
@@ -277,12 +281,23 @@ function builtin() {
   }
 }
 
+function installBundledKai() {
+  if (!app.isPackaged || settings.load('kai-bundle-installed.json', false)) return;
+  const filename = `${KAI_PLUGIN_ID}.nvp`;
+  const bundled = path.join(process.resourcesPath, 'bundled-plugins', filename);
+  if (!fs.existsSync(bundled)) return;
+  // Existing plugin choices are kept. Mark the bundle as handled so uninstalling it sticks.
+  if (fs.existsSync(path.join(dir(), filename)) || installFile(bundled).ok) {
+    settings.save('kai-bundle-installed.json', true);
+  }
+}
+
 function start(sendFn) {
   send = sendFn;
   if (!cache.catalog.length) cache.catalog = builtin();
   loadInstalled();
+  installBundledKai();
   send('plugins', active());
-  setTimeout(() => refresh(), 30 * 1000);
 }
 
-module.exports = { start, active, list, refresh, install, installFile, remove, setEnabled, setSetting };
+module.exports = { KAI_PLUGIN_ID, start, active, list, refresh, install, installFile, remove, setEnabled, setSetting };

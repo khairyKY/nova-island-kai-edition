@@ -121,8 +121,8 @@
         chime();
         // Nova in her prayer cap on the rug; the plain toast when she's off or there's no room
         const iftar = k === 'maghrib' && isRamadan(d) ? ' · تقبّل الله صيامك' : '';
-        const shown = feat('novaPrayer') && window.playScene?.({
-          who: 'nova', props: ['cap', 'rug'], arms: 'fold', tone: 'gold', badge: '☾ الأذان', lang: 'ar',
+        const shown = (window.phoenix?.style() !== 'classic' || feat('novaPrayer')) && window.playScene?.({
+          who: 'nova', phoenixPose:'prayer', props: ['cap', 'rug'], arms: 'fold', tone: 'gold', badge: '☾ الأذان', lang: 'ar',
           title: 'أَقِمْ صَلَاتَكَ', quran: true,
           sub: `حان الآن وقت صلاة <b>${NAMES[k]}</b><bdi dir="ltr">${clock(t)}</bdi>${iftar}`,
           ms: 45000,

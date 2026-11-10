@@ -1,9 +1,10 @@
 {
   "name": "nova-island",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "A living island for your Windows desktop",
   "main": "nova.js",
   "scripts": {
+    "prepare:phoenix": "electron tools/prepare-phoenix.cjs",
     "start": "electron .",
     "dist": "electron-builder --win nsis",
     "dist:portable": "electron-builder --win portable",
@@ -16,9 +17,9 @@
     "electron-builder": "^26.17.0"
   },
   "build": {
-    "appId": "com.dynamicnova.app",
-    "productName": "Nova Island",
-    "copyright": "Copyright © 2026 Nova Island by AmerTech",
+    "appId": "com.khairyky.nova-island-kai",
+    "productName": "Nova Island Kai Edition",
+    "copyright": "Copyright © 2026 Nova Island by AmerTech; Kai Edition changes by Khairy Shaheen",
     "electronLanguages": [
       "en-US",
       "ar"
@@ -43,43 +44,52 @@
       "!contrib/**",
       "!keys/**",
       "!nova-island-plugins/**",
+      "!local-plugins/**",
       "!tools/**",
       "!scripts/**",
       "!news.json",
       "!build/appx/**",
-      "!store/**"
+      "!store/**",
+      "!assets/phoenix-v1/*.png",
+      "!assets/phoenix-v1/generation.json",
+      "!assets/zaher-v1/*.png",
+      "!assets/zaher-v1/generation.json"
     ],
     "publish": {
       "provider": "github",
-      "owner": "NOVA-TECH-KIT",
-      "repo": "nova-island"
+      "owner": "khairyKY",
+      "repo": "nova-island-kai-edition"
     },
     "asarUnpack": [
-      "helper/nova-helper.exe"
+      "helper/nova-helper.exe",
+      "helper/browser-media-host.exe"
+    ],
+    "extraResources": [
+      { "from": "local-plugins/kais-flow.nvp", "to": "bundled-plugins/kais-flow.nvp" }
     ],
     "win": {
       "target": [
         "nsis"
       ],
       "icon": "build/icon.ico",
-      "executableName": "Nova Island"
+      "executableName": "Nova Island Kai Edition"
     },
     "nsis": {
       "oneClick": false,
-      "artifactName": "Nova-Island-Setup-${version}.${ext}",
+      "artifactName": "Nova-Island-Kai-Edition-Setup-${version}.${ext}",
       "license": "LICENSE",
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "Nova Island",
+      "shortcutName": "Nova Island Kai Edition",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     },
     "portable": {
-      "artifactName": "Nova Island ${version} portable.exe"
+      "artifactName": "Nova Island Kai Edition ${version} portable.exe"
     },
     "appx": {
       "identityName": "AmerTech.NovaIsland",

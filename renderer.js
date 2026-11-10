@@ -38,7 +38,9 @@ const feat = (key) => state.features[key] !== false;
 
 // Good news: sparkles fly out of the island's edges.
 function celebrate(colors = ['#ffd479', '#30d158', '#8ab4ff', '#ff6b9d']) {
-  if (!feat('celebrate') || anchor.vertical || state.features.noAnimations) return;
+  if (!feat('celebrate')) return;
+  window.phoenixCelebrate?.();
+  if (anchor.vertical || state.features.noAnimations) return;
   const r = island.getBoundingClientRect();
   const cx = r.left + r.width / 2;
   const cy = r.top + r.height / 2;
@@ -75,7 +77,6 @@ const fmt = (sec) => {
 };
 
 // ---------------- mode ----------------
-const SIZE = { idle: 1, compact: 2, toast: 3, peek: 4, reminder: 4, scene: 4, expanded: 5 };
 
 function timerActive() {
   return state.timer.running || state.timer.remaining > 0;
@@ -93,7 +94,7 @@ function compactKind() {
 function currentMode() {
   const now = Date.now();
   // a character scene (adhan, water, focus) owns the island until it ends or is closed
-  if (state.sceneUntil > now && !anchor.vertical) return 'scene';
+  if (state.sceneUntil > now && (!anchor.vertical || island.classList.contains('sc-phoenix') || island.classList.contains('sc-plain'))) return 'scene';
   // a toast with a button (Join) stays under the cursor so it can be clicked
   if (state.toastAction && state.toast && now < state.toastUntil && !state.pinned) return 'toast';
   // a reminder stays put under the cursor so it can be read (hovering pauses it)
@@ -108,18 +109,27 @@ function currentMode() {
 }
 
 let lastMode = '';
+const SIZE = { idle: 1, compact: 2, toast: 3, peek: 4, reminder: 4, scene: 4, expanded: 5 };
+
 function render() {
   const mode = currentMode();
-  if (mode !== lastMode) {
-    island.classList.toggle('shrinking', !!lastMode && SIZE[mode] < SIZE[lastMode]);
+  const prev = lastMode;
+  const changedMode = mode !== prev;
+  if (changedMode) {
+    // growing springs past its size a little; shrinking settles softer and quicker
+    island.classList.toggle('shrinking', !!prev && SIZE[mode] < SIZE[prev]);
     island.classList.remove('idle', 'compact', 'toast', 'peek', 'reminder', 'scene', 'expanded');
     island.classList.add(mode);
-    const prev = lastMode;
     lastMode = mode;
-    if (typeof positionIsland === 'function') positionIsland();
-    if (typeof wake === 'function') wake();
-    window.dispatchEvent(new CustomEvent('island:mode', { detail: { mode, prev } }));
   }
+  const kaiNotice = mode === 'toast' && state.toast === 'kai-flow';
+  const sideHud = mode === 'toast' && (state.toast === 'vol' || state.toast === 'bright');
+  const changedToastSize = kaiNotice !== island.classList.contains('kai-notice') || sideHud !== island.classList.contains('side-hud');
+  island.classList.toggle('kai-notice', kaiNotice);
+  island.classList.toggle('side-hud', sideHud);
+  const noticeClose = $('#kai-notice-close');
+  if (noticeClose.hidden === kaiNotice) noticeClose.hidden = !kaiNotice;
+  island.classList.toggle('kai-compact', state.features.kaiNoticeStyle === 'compact');
   island.classList.toggle('has-media', !!state.media.has);
   island.classList.toggle('playing', !!state.media.playing);
   const kind = compactKind();
@@ -129,12 +139,16 @@ function render() {
   }
   const showTitle = kind === 'dl' || (kind === 'media' && feat('mediaTitle'));
   const wide = showTitle;
-  if (wide !== island.classList.contains('c-wide')) {
-    island.classList.toggle('c-wide', wide);
-    if (typeof positionIsland === 'function') positionIsland();
-  }
+  const changedWidth = wide !== island.classList.contains('c-wide');
+  island.classList.toggle('c-wide', wide);
   setCompactTitle(!showTitle ? '' : kind === 'media' ? state.media.title : state.dl.title);
   $('.c-title').hidden = !showTitle;
+  if (changedMode || changedWidth || changedToastSize) positionIsland();
+  if (changedMode) {
+    syncProgress();
+    window.dispatchEvent(new CustomEvent('island:mode', { detail: { mode, prev } }));
+  }
+  syncAudioMeter();
 }
 
 // Title between the art and the equalizer; scrolls back and forth when it doesn't fit.
@@ -166,7 +180,8 @@ window.addEventListener('island:mode', (e) => {
   if (e.detail.mode === 'compact') fitCompactTitle();
 });
 
-// ---------------- hover (main process polls the cursor with hover intent) ----------------
+// ---------------- hover (main polls the cursor with hover intent) ----------------
+// leaving waits a moment, so grazing the edge doesn't snap the panel shut
 let hoverTimer = null;
 bridge.onHover((v) => {
   clearTimeout(hoverTimer);
@@ -182,16 +197,14 @@ bridge.onHover((v) => {
 });
 
 let lastRect = '';
-let lastClickable = false;
+// Where the island is heading. While it morphs, the hitbox is already the final shape, so the
+// cursor never falls out of a half-grown island and flickers it shut.
+let target = null;
 function reportRect() {
   // something on the island to click (a toast with a button, a reminder or a scene): over the
   // browser in "Stay in place" it takes the mouse again for as long as it's there
   const clickable = (lastMode === 'toast' && !!state.toastAction && Date.now() < state.toastUntil) || lastMode === 'reminder' || lastMode === 'scene';
-  if (clickable !== lastClickable) {
-    lastClickable = clickable;
-    bridge.setClickable(clickable);
-  }
-  let r = island.getBoundingClientRect();
+  let r = target && !state.moving ? target : island.getBoundingClientRect();
   // during a scene the card beside the character must take the mouse too
   if (lastMode === 'scene') {
     const c = $('#scene-card').getBoundingClientRect();
@@ -199,21 +212,18 @@ function reportRect() {
     const top = Math.min(r.top, c.top);
     r = { left, top, width: Math.max(r.right, c.right) - left, height: Math.max(r.bottom, c.bottom) - top };
   }
-  const rect = { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) };
+  const rect = { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height), scale: anchor.scale || 1, mode: lastMode, clickable };
   const key = JSON.stringify(rect);
   if (key !== lastRect) {
     lastRect = key;
     bridge.setRect(rect);
   }
 }
-// The rect only changes while the island morphs or moves (the frame loop is running then), so it's
-// read 20 times a second during a change and 4 times a second while it sits still; with the
-// performance options on it only has to keep pace with the hover intent.
-const light = () => !!(state.features.noBlur || state.features.noAnimations || state.features.glassFreeze);
-setTimeout(function reportLoop() {
-  reportRect();
-  setTimeout(reportLoop, frameRunning || state.moving ? 50 : light() ? 300 : 250);
-}, 0);
+const hitboxObserver = new ResizeObserver(reportRect);
+hitboxObserver.observe(island);
+hitboxObserver.observe($('#scene-card'));
+island.addEventListener('transitionend', (e) => { if (e.target === island) reportRect(); });
+$('#scene-card').addEventListener('transitionend', reportRect);
 
 bridge.onToggle(() => {
   state.pinned = !state.pinned;
@@ -259,9 +269,7 @@ island.addEventListener('lostpointercapture', endMove);
 island.addEventListener('click', (e) => {
   if (!justMoved && lastMode === 'toast' && state.toastAction) {
     const act = state.toastAction;
-    state.toastAction = null;
-    state.toastUntil = 0;
-    render();
+    dismissToast();
     act();
     return;
   }
@@ -283,23 +291,50 @@ let anchor = { x: window.innerWidth / 2, y: 8, docked: false, vertical: false, s
 
 function positionIsland() {
   let [w, h] = (anchor.vertical ? VDIMS : DIMS)[lastMode] || DIMS.idle;
+  if (lastMode === 'toast' && state.toast === 'kai-flow') {
+    [w, h] = state.features.kaiNoticeStyle === 'compact' ? [380, 74] : [420, 110];
+  } else if (anchor.vertical && lastMode === 'toast' && !island.classList.contains('side-hud')) {
+    [w, h] = [340, 76];
+  }
   if (lastMode === 'compact' && !anchor.vertical && island.classList.contains('c-wide')) w = COMPACT_WIDE;
   if (lastMode === 'reminder') [w, h] = state.reminderSize;
   // in the browser's address bar: a slim pill, or a thin line while the user types there
   if (anchor.addr && !anchor.vertical && (lastMode === 'idle' || lastMode === 'compact')) {
     [w, h] = anchor.addr === 'line' ? [90, 3] : [anchor.sw, anchor.sh];
   }
+  target = null;
   if (lastMode === 'scene') {
     // the body on the right, the card on its left: [card 430][gap 22][body 64], kept inside the window
+    if(island.classList.contains('sc-phoenix') || island.classList.contains('sc-plain')){
+      // sprite box, as in phoenix.css (Zaher is taller than wide)
+      const [sprite, spriteH] = !island.classList.contains('sc-phoenix') ? [0, 0] : island.classList.contains('sc-zaher') ? [120, 142] : [140, 140];
+      const gap = sprite ? 18 : 0;
+      const card = $('#scene-card');
+      const cardWidth = Math.min(390,window.innerWidth-sprite-gap-16);
+      card.style.width = `${cardWidth}px`;
+      const height = Math.max(spriteH,card.offsetHeight);
+      const fullWidth = cardWidth+gap+sprite;
+      const left = Math.max(8,Math.min(anchor.x-fullWidth/2,window.innerWidth-fullWidth-8));
+      const desiredTop = anchor.addr ? anchor.rowBottom+10 : anchor.vertical ? anchor.y-height/2 : anchor.y+12;
+      const top = Math.max(8,Math.min(desiredTop,window.innerHeight-height-8));
+      const characterFirst = anchor.vertical && anchor.side === 'left';
+      island.style.setProperty('--x',`${Math.round(characterFirst ? left : left+cardWidth+gap)}px`);
+      island.style.setProperty('--y',`${Math.round(top+(height-spriteH)/2)}px`);
+      card.style.left = `${Math.round(characterFirst ? left+sprite+gap : left)}px`;
+      card.style.top = `${Math.round(top)}px`;
+      reportRect();return;
+    }
     const CW = 516;
     const left = Math.min(Math.max(anchor.x - CW / 2, 8), window.innerWidth - CW - 8);
-    const top = anchor.docked ? 30 : Math.min(Math.max(anchor.y + 22, 10), window.innerHeight - 130);
+    const sceneTop = anchor.addr ? anchor.rowBottom + 14 : anchor.y + 22;
+    const top = anchor.docked ? 30 : Math.min(Math.max(sceneTop, 10), window.innerHeight - 130);
     island.style.setProperty('--x', `${Math.round(left + CW - 64)}px`);
     island.style.setProperty('--y', `${Math.round(top)}px`);
     const card = $('#scene-card');
+    card.style.width = '';
     card.style.left = `${Math.round(left)}px`;
     card.style.top = `${Math.round(top - 14)}px`;
-    wake();
+    reportRect();
     return;
   }
   const W = window.innerWidth;
@@ -308,20 +343,35 @@ function positionIsland() {
   let x;
   let y;
   if (anchor.vertical) {
-    // flush against the screen edge, centered on the anchor, kept inside the window
-    x = anchor.side === 'left' ? 0 : W - w;
+    // Keep the slim states against the edge. Readable cards open inward.
+    const inset = lastMode === 'idle' || lastMode === 'compact' || island.classList.contains('side-hud') ? 0 : 6;
+    x = anchor.side === 'left' ? inset : W - w - inset;
     y = clamp(anchor.y - h / 2, 4, H - h - 4);
   } else {
-    x = clamp(anchor.x - w / 2, 4, W - w - 4);
-    y = anchor.docked ? 0 : clamp(anchor.y, 0, H - h - 6);
+    const belowBar = anchor.addr && lastMode !== 'idle' && lastMode !== 'compact';
+    const panelLeft = belowBar ? Math.max(4, anchor.panelLeft) : 4;
+    const panelRight = belowBar ? Math.min(W - 4, anchor.panelRight) : W - 4;
+    x = panelRight - panelLeft >= w
+      ? clamp(anchor.x - w / 2, panelLeft, panelRight - w)
+      : clamp(anchor.x - w / 2, 4, W - w - 4);
+    const bottom = H - h - 6;
+    const centeredLine = anchor.addr === 'line' && !belowBar ? (anchor.sh - h) / 2 : 0;
+    y = anchor.docked ? 0 : clamp(anchor.y + centeredLine, 0, bottom);
+    if (belowBar) {
+      const below = anchor.rowBottom + 8;
+      const above = anchor.rowTop - h - 8;
+      y = below > bottom && above >= 0 ? above : clamp(below, 0, bottom);
+    }
   }
   island.style.setProperty('--x', `${Math.round(x)}px`);
   island.style.setProperty('--y', `${Math.round(y)}px`);
-  wake(); // the glass must follow the island while it slides into place
+  target = { left: Math.round(x), top: Math.round(y), width: w, height: h };
+  reportRect();
 }
 
 bridge.onAnchor((a) => {
   anchor = a;
+  document.body.style.setProperty('--island-scale', a.scale || 1);
   island.classList.toggle('addr-slim', a.addr === 'slim');
   island.classList.toggle('addr-line', a.addr === 'line');
   if (a.addr) {
@@ -333,7 +383,17 @@ bridge.onAnchor((a) => {
   island.classList.toggle('side-left', !!a.vertical && a.side === 'left');
   island.classList.toggle('side-right', !!a.vertical && a.side === 'right');
   positionIsland();
+  // the anchor arrives often (browser moves, foreground changes): only a new width re-measures,
+  // otherwise the scrolling title would restart from the beginning every time
+  const fitKey = `${a.addr}|${a.sw}|${a.vertical}|${a.scale}`;
+  if (fitKey !== lastFitKey) {
+    lastFitKey = fitKey;
+    fitCompactTitle();
+    fitBrowserStats();
+  }
+  syncAudioMeter();
 });
+let lastFitKey = '';
 
 island.addEventListener('contextmenu', (e) => {
   e.preventDefault();
@@ -344,23 +404,34 @@ island.addEventListener('contextmenu', (e) => {
 // ---------------- glass backdrop ----------------
 const bd = $('#bd');
 const bdCtx = bd.getContext('2d');
-const off = document.createElement('canvas');
-const offCtx = off.getContext('2d');
-let fadeFrames = 0;
 
 function sizeCanvases() {
-  [bd, off].forEach((c) => {
-    c.width = window.innerWidth;
-    c.height = window.innerHeight;
-  });
+  // Glass is blurred anyway. Keep the backing surfaces smaller than the CSS box.
+  const w = Math.ceil(window.innerWidth / 3), h = Math.ceil(window.innerHeight / 3);
+  if (bd.width !== w) bd.width = w;
+  if (bd.height !== h) bd.height = h;
   bd.style.width = `${window.innerWidth}px`;
   bd.style.height = `${window.innerHeight}px`;
 }
 sizeCanvases();
-window.addEventListener('resize', sizeCanvases);
+window.addEventListener('resize', () => { sizeCanvases(); positionIsland(); });
 
-// the backdrop arrives as raw pixels (BGRA, Windows' order): swapped to RGBA, then drawn blurred
+// the backdrop arrives as raw pixels (BGRA, Windows' order): swapped to RGBA, blurred into a
+// spare canvas, then faded over the old glass in a few frames instead of swapping at once
+const bdNext = new OffscreenCanvas(1, 1);
+const bdNextCtx = bdNext.getContext('2d');
+let bdSeq = 0;
+let bdFade = 0;
+function fadeBackdrop() {
+  if (bdFade <= 0) return;
+  bdCtx.globalAlpha = bdFade === 1 ? 1 : .2;
+  bdCtx.drawImage(bdNext, 0, 0);
+  bdCtx.globalAlpha = 1;
+  bdFade--;
+  if (bdFade > 0) requestAnimationFrame(fadeBackdrop);
+}
 bridge.onBackdrop(async (frame) => {
+  const seq = ++bdSeq;
   let img;
   if (typeof frame === 'string') {
     img = new Image();
@@ -376,90 +447,97 @@ bridge.onBackdrop(async (frame) => {
     }
     img = await createImageBitmap(new ImageData(px, frame.w, frame.h));
   }
-  const { width: w, height: h } = off;
-  offCtx.filter = 'none';
-  offCtx.drawImage(img, 0, 0, w, h);
-  offCtx.filter = 'blur(22px) saturate(180%) brightness(.92)';
-  offCtx.drawImage(img, -24, -24, w + 48, h + 48);
+  if (seq !== bdSeq) return img.close?.(); // a newer frame arrived while this one decoded
+  const { width: w, height: h } = bd;
+  if (bdNext.width !== w || bdNext.height !== h) { bdNext.width = w; bdNext.height = h; }
+  bdNextCtx.filter = 'none';
+  bdNextCtx.drawImage(img, 0, 0, w, h);
+  bdNextCtx.filter = 'blur(7px) saturate(180%) brightness(.92)';
+  bdNextCtx.drawImage(img, -8, -8, w + 16, h + 16);
   img.close?.();
-  fadeFrames = 10;
-  wake(300);
+  const running = bdFade > 0;
+  bdFade = state.features.noAnimations || !state.visible ? 1 : 10;
+  if (!running) requestAnimationFrame(fadeBackdrop);
 });
-
-const segThumb = $('.seg-thumb');
-function placeSegThumb() {
-  const a = $('.tab.active');
-  if (!a) return;
-  segThumb.style.width = `${a.offsetWidth}px`;
-  segThumb.style.transform = `translateX(${a.offsetLeft}px)`;
-}
-
-// The frame loop only runs while something moves: the island morphing, a fresh backdrop
-// fading in, or the open island (tab thumb, media progress). Idle, it stops completely.
-let frameRunning = false;
-let awakeUntil = 0;
-let lastBd = '';
-function wake(ms = 900) {
-  awakeUntil = Math.max(awakeUntil, performance.now() + ms);
-  if (!frameRunning) {
-    frameRunning = true;
-    requestAnimationFrame(frame);
-  }
-}
-
-function frame() {
-  // reading the layout every frame while the island sits open is wasted work; whole pixels, so
-  // the captured glass doesn't tremble at its edges
-  if (state.moving || performance.now() < awakeUntil) {
-    const r = island.getBoundingClientRect();
-    const key = `${Math.round(r.left)},${Math.round(r.top)}`;
-    if (key !== lastBd) {
-      lastBd = key;
-      bd.style.transform = `translate(${-Math.round(r.left)}px, ${-Math.round(r.top)}px)`;
-    }
-  }
-  if (fadeFrames > 0) {
-    bdCtx.globalAlpha = fadeFrames === 1 ? 1 : 0.22;
-    bdCtx.drawImage(off, 0, 0);
-    fadeFrames--;
-  }
-  if (lastMode === 'expanded') {
-    placeSegThumb();
-    tickProgress();
-  }
-  if (fadeFrames > 0 || lastMode === 'expanded' || state.moving || performance.now() < awakeUntil) {
-    requestAnimationFrame(frame);
-  } else {
-    frameRunning = false;
-  }
-}
 
 // ---------------- tabs ----------------
 $$('.tab').forEach((btn) => btn.addEventListener('click', () => selectTab(btn.dataset.tab)));
+const seg = $('.seg');
+const segThumb = $('.seg-thumb');
+const markTabs = (tab) => $$('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+// The thumb slides to where the active tab ends up once its label has opened. That spot is read
+// once with transitions off (no per-frame layout reads), then the old state is put back so the
+// labels and the thumb animate to it together.
+function placeSegThumb(from) {
+  const tab = $('.tab.active')?.dataset.tab;
+  seg.classList.add('measuring');
+  const a = $('.tab.active');
+  const end = a && { w: a.offsetWidth, x: a.offsetLeft };
+  if (from !== undefined) markTabs(from);
+  void seg.offsetWidth; // commit the starting point while transitions are off
+  seg.classList.remove('measuring');
+  if (from !== undefined) markTabs(tab);
+  if (!end) return;
+  segThumb.style.width = `${end.w}px`;
+  segThumb.style.transform = `translateX(${end.x}px)`;
+}
 function selectTab(tab) {
+  const view = $(`#v-${tab}`);
+  if (!view || view.classList.contains('active')) return;
+  const from = state.tab;
   state.tab = tab;
   $$('.tab').forEach((b) => {
     const on = b.dataset.tab === tab;
     b.classList.toggle('active', on);
     b.setAttribute('aria-selected', on);
   });
-  $$('.view').forEach((v) => v.classList.toggle('active', v.id === `v-${tab}`));
+  placeSegThumb(lastMode === 'expanded' ? from : undefined);
+  $('.view.active')?.classList.remove('active');
+  view.classList.add('active');
+  syncProgress();
+  syncAudioMeter();
 }
 
 // ---------------- clock ----------------
+const clockFormat = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', hour12: true });
 function tickClock() {
   const d = new Date();
-  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const time = clockFormat.format(d);
   const date = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
   $('#x-clock').textContent = $('#i-time').textContent = time;
   $('#x-date').textContent = $('#i-date').textContent = date;
-  $('#v-time').textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  $('#i-stats-time').textContent = time;
+  const period = clockFormat.formatToParts(d).find(part => part.type === 'dayPeriod')?.value || '';
+  $('#v-time').textContent = period ? time.replace(period, '').trim() : time;
+  $('#v-period').textContent = period;
   $('#v-day').textContent = d.toLocaleDateString([], { weekday: 'short', day: 'numeric' });
+  fitBrowserStats();
 }
 tickClock();
 setInterval(tickClock, 5000);
 
 // ---------------- idle pill: rotates clock/weather, CPU/RAM and the next prayer ----------------
+// Fill the browser's wider pill, trimming detail before dropping either extra reading.
+// Measure the real text: toolbar width, UI scale and locale all affect what fits.
+function fitBrowserStats() {
+  const slide = $('.stats-slide');
+  slide.classList.remove('stats-tight', 'stats-no-clock', 'stats-no-battery');
+  if (!island.classList.contains('addr-slim') || !slide.clientWidth) return;
+  const fits = () => {
+    const style = getComputedStyle(slide);
+    const items = [...slide.children].filter(el => getComputedStyle(el).display !== 'none');
+    const used = items.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0)
+      + Math.max(0, items.length - 1) * parseFloat(style.columnGap)
+      + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    return used <= slide.clientWidth;
+  };
+  for (const compact of ['stats-tight', 'stats-no-clock', 'stats-no-battery']) {
+    if (fits()) break;
+    slide.classList.add(compact);
+  }
+}
+new ResizeObserver(fitBrowserStats).observe($('.stats-slide'));
+
 let infoSlide = 0;
 setInterval(() => {
   if (lastMode !== 'idle') return;
@@ -487,6 +565,7 @@ bridge.onStats((s) => {
   set('ram', s.ram);
   $('#v-cpu').textContent = `${Math.round(s.cpu * 100)}%`;
   $('#v-ram').textContent = `${Math.round(s.ram * 100)}%`;
+  fitBrowserStats();
 });
 
 // ---------------- sliders ----------------
@@ -556,41 +635,69 @@ function appName(id) {
 }
 
 function setAccent(r, g, b) {
-  document.documentElement.style.setProperty('--accent-rgb', `${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}`);
+  island.style.setProperty('--artwork-rgb', `${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}`);
+  island.style.setProperty('--artwork-vivid', vivid(r, g, b).join(', '));
+}
+// the same hue, saturated and at a brightness a white icon reads on (grey art stays grey)
+function vivid(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  const l0 = (max + min) / 2;
+  const s0 = d ? d / (1 - Math.abs(2 * l0 - 1)) : 0;
+  const s = s0 < .08 ? s0 : Math.max(s0, .72);
+  const l = Math.min(.52, Math.max(.4, l0));
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h % 2 + 2) % 2 - 1)), m = l - c / 2;
+  const [R, G, B] = h < 1 ? [c, x, 0] : h < 2 ? [x, c, 0] : h < 3 ? [0, c, x] : h < 4 ? [0, x, c] : h < 5 ? [x, 0, c] : [c, 0, x];
+  return [R, G, B].map((v) => Math.round((v + m) * 255));
 }
 
-function setAccentFromImage(img) {
+const SOURCE_ACCENTS = {
+  spotify: [30, 215, 96], youtube: [239, 61, 70], 'youtube-music': [239, 61, 70],
+  opera: [238, 70, 94], apple: [231, 76, 118], soundcloud: [235, 110, 46],
+  twitch: [150, 98, 229], vimeo: [50, 162, 218], vlc: [235, 145, 46],
+  chrome: [61, 148, 222], msedge: [45, 162, 178], brave: [233, 119, 51], firefox: [224, 109, 61],
+};
+let artworkPalette = null;
+
+function accentFromImage(img) {
   try {
     const c = document.createElement('canvas');
     c.width = c.height = 24;
     const ctx = c.getContext('2d');
     ctx.drawImage(img, 0, 0, 24, 24);
     const px = ctx.getImageData(0, 0, 24, 24).data;
-    let r = 0, g = 0, b = 0, n = 0;
+    // Pick the strongest hue family so contrasting cover colours don't average to grey.
+    const hues = Array.from({length: 12}, () => [0, 0, 0, 0]);
     for (let i = 0; i < px.length; i += 4) {
-      const max = Math.max(px[i], px[i + 1], px[i + 2]);
-      const min = Math.min(px[i], px[i + 1], px[i + 2]);
-      if (max < 50 || max - min < 30) continue; // skip dark / grey pixels
-      const wgt = max - min; // favour saturated pixels
-      r += px[i] * wgt; g += px[i + 1] * wgt; b += px[i + 2] * wgt; n += wgt;
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      const max = Math.max(r, g, b), chroma = max - Math.min(r, g, b);
+      if (px[i + 3] < 100 || max < 50 || chroma < 30) continue;
+      const hue = max === r ? (g - b) / chroma : max === g ? 2 + (b - r) / chroma : 4 + (r - g) / chroma;
+      const bucket = hues[(Math.round(hue * 2) + 12) % 12];
+      bucket[0] += r * chroma;
+      bucket[1] += g * chroma;
+      bucket[2] += b * chroma;
+      bucket[3] += chroma;
     }
-    if (!n) return setAccent(220, 220, 230);
-    r /= n; g /= n; b /= n;
-    const k = 235 / Math.max(r, g, b); // lift so the accent reads on dark glass
-    setAccent(Math.min(255, r * k), Math.min(255, g * k), Math.min(255, b * k));
-  } catch {}
+    const [r, g, b, weight] = hues.reduce((best, bucket) => bucket[3] > best[3] ? bucket : best);
+    if (!weight) return null;
+    const lift = 235 / Math.max(r, g, b);
+    return [r * lift, g * lift, b * lift];
+  } catch { return null; }
 }
 
 // Gradient tile with a note, used until (or when) the player provides no artwork.
-function placeholderArt(seed) {
+function placeholderArt(seed, color) {
   const c = document.createElement('canvas');
   c.width = c.height = 160;
   const ctx = c.getContext('2d');
   let h = 210;
   for (const ch of seed || '') h = (h * 31 + ch.charCodeAt(0)) % 360;
   const g = ctx.createLinearGradient(0, 0, 160, 160);
-  g.addColorStop(0, `hsl(${h}, 70%, 58%)`);
-  g.addColorStop(1, `hsl(${(h + 45) % 360}, 65%, 28%)`);
+  g.addColorStop(0, color ? `rgb(${color.join(',')})` : `hsl(${h}, 70%, 58%)`);
+  g.addColorStop(1, color ? `rgb(${color.map(n => Math.round(n * .42)).join(',')})` : `hsl(${(h + 45) % 360}, 65%, 28%)`);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 160, 160);
   ctx.translate(32, 32);
@@ -600,11 +707,23 @@ function placeholderArt(seed) {
   return c.toDataURL('image/png');
 }
 
-function setArt(url) {
+let currentArtUrl = '';
+function setArt(url, real = false) {
+  if (currentArtUrl === url) return;
+  currentArtUrl = url;
   ['#c-art', '#vc-art', '#p-art', '#m-art', '#m-art-glow'].forEach((s) => ($(s).src = url));
-  const img = new Image();
-  img.onload = () => setAccentFromImage(img);
-  img.src = url;
+  if (!real) return;
+  const img = $('#m-art');
+  img.decode().then(() => {
+    if (currentArtUrl !== url || !state.media.has) return;
+    artworkPalette = accentFromImage(img);
+    setAccent(...(artworkPalette || SOURCE_ACCENTS[state.media.source?.id] || [107, 160, 215]));
+  }).catch(() => {
+    if (currentArtUrl !== url || !state.media.has) return;
+    hasArtwork = false;
+    const m = state.media;
+    setArt(placeholderArt(m.title + m.app, SOURCE_ACCENTS[m.source?.id]));
+  });
 }
 
 function setPlayingUI(playing) {
@@ -613,6 +732,52 @@ function setPlayingUI(playing) {
   view.classList.toggle('paused', state.media.has && !playing);
   $$('.eq').forEach((e) => e.classList.toggle('paused', !playing));
 }
+
+const meterElements = {
+  compact: $('.l-compact .audio-meter'), side: $('.l-vcompact .audio-meter'),
+  peek: $('.l-peek .audio-meter'), expanded: $('#v-media .audio-meter'),
+};
+const silentBands = [0, 0, 0, 0, 0];
+let activeMeter = null;
+let meterBands = silentBands;
+function syncAudioMeter() {
+  let next = null;
+  if (state.visible && state.media.has && state.media.playing && !state.muted) {
+    if (lastMode === 'compact' && compactKind() === 'media') next = meterElements[anchor.vertical ? 'side' : 'compact'];
+    else if (lastMode === 'peek' || (lastMode === 'expanded' && state.tab === 'media')) next = meterElements[lastMode];
+  }
+  if (next === activeMeter) return;
+  const wasOn = !!activeMeter;
+  activeMeter = next;
+  if (activeMeter) { shownBands = [0, 0, 0, 0, 0]; drawAudioBands(meterBands); }
+  else meterBands = silentBands;
+  island.classList.toggle('audio-meter-live', !!activeMeter);
+  if (wasOn !== !!activeMeter) bridge.setAudioMeter(!!activeMeter);
+}
+// The helper sends ~30 band sets a second; the bars ease toward them every frame (quick rise,
+// slow fall like a real meter), and the frame loop stops once they've settled.
+let shownBands = [0, 0, 0, 0, 0];
+let meterFrame = 0;
+function meterStep() {
+  meterFrame = 0;
+  if (!activeMeter) return;
+  let moving = false;
+  for (let i = 0; i < activeMeter.children.length; i++) {
+    const want = Math.min(1, Math.max(0, meterBands[i] || 0));
+    const d = want - shownBands[i];
+    shownBands[i] += d * (d > 0 ? .5 : .16);
+    if (Math.abs(want - shownBands[i]) > .004) moving = true;
+    else shownBands[i] = want;
+    activeMeter.children[i].style.setProperty('--audio-level', shownBands[i].toFixed(3));
+  }
+  if (moving) meterFrame = requestAnimationFrame(meterStep);
+}
+function drawAudioBands(bands) {
+  if (!activeMeter) return;
+  meterBands = bands;
+  if (!meterFrame) meterFrame = requestAnimationFrame(meterStep);
+}
+bridge.onAudioBands(drawAudioBands);
 
 // True while the user is looking at the player itself (e.g. the YouTube tab in Chrome),
 // so the island doesn't repeat what is already on screen.
@@ -631,9 +796,35 @@ function isMediaInFront(m) {
 }
 
 let lastTrack = null;
-let hasRealArt = false;
+let hasArtwork = false;
+let lastSourceKey = null;
+function updateMediaSource(m) {
+  const source = m.has ? m.source : null;
+  const key = source ? `${source.id}|${source.icon}` : '';
+  if (key === lastSourceKey) return;
+  lastSourceKey = key;
+  island.classList.toggle('has-source', !!source);
+  island.dataset.mediaSource = source?.id || '';
+  $$('.media-source-icon').forEach(el => {
+    el.hidden = !source;
+    el.setAttribute('aria-label', source ? `${source.name} logo` : '');
+    const vector = source?.vector !== false;
+    el.classList.toggle('source-image', !vector);
+    if (source && vector) {
+      el.style.maskImage = `url("${source.icon}")`;
+      el.replaceChildren();
+    } else if (source) {
+      el.style.maskImage = 'none';
+      if (el.firstChild?.src !== source.icon) {
+        const img = new Image(); img.src = source.icon; img.alt = ''; el.replaceChildren(img);
+      }
+    }
+  });
+  $('#v-media').classList.toggle('spotify-source', source?.id === 'spotify');
+}
 bridge.onMedia((m) => {
   if (m.error) return;
+  const previous = state.media;
   const lock = state.playLock;
   if (lock && Date.now() < lock.until && m.has && m.playing !== lock.value) {
     m.playing = lock.value;
@@ -644,37 +835,61 @@ bridge.onMedia((m) => {
   state.media = m;
   state.mediaAt = performance.now();
   state.mediaFront = isMediaInFront(m);
+  updateMediaSource(m);
+  const battery = $('#i-battery-group');
+  const batteryText = typeof m.bat === 'number' && m.bat >= 0 && m.bat <= 100 ? `${Math.round(m.bat)}%` : '';
+  const batteryChanged = $('#i-battery').textContent !== batteryText;
+  if (batteryChanged || m.ac !== previous.ac) {
+    battery.hidden = !batteryText;
+    $('#i-battery').textContent = batteryText;
+    battery.classList.toggle('charging', !!m.ac);
+    battery.classList.toggle('low', !!batteryText && m.bat <= 20 && !m.ac);
+    battery.title = batteryText ? `Battery ${batteryText}${m.ac ? ' · charging' : ''}` : '';
+  }
+  if (batteryChanged) fitBrowserStats();
 
   const key = m.has ? `${m.title}|${m.artist}|${m.app}` : null;
+  const trackChanged = key !== lastTrack;
+  const sourceChanged = m.source?.id !== previous.source?.id || m.source?.name !== previous.source?.name;
   if (key !== lastTrack) {
     if (key && lastTrack && m.title && !state.mediaFront && feat('trackPeek')) {
       state.peekUntil = Date.now() + 3200;
       setTimeout(render, 3300);
     }
     lastTrack = key;
-    hasRealArt = false;
-    if (key) setArt(placeholderArt(m.title + m.app));
+    hasArtwork = false;
+    artworkPalette = null;
+    currentArtUrl = '';
   }
+  const sourceColor = SOURCE_ACCENTS[m.source?.id];
+  if (m.has && !artworkPalette && (trackChanged || sourceChanged)) setAccent(...(sourceColor || [107, 160, 215]));
   if (m.thumb) {
-    hasRealArt = true;
-    setArt(`data:image/png;base64,${m.thumb}`);
+    hasArtwork = true;
+    setArt(`data:image/png;base64,${m.thumb}`, true);
+  } else if (m.has && !hasArtwork && (trackChanged || sourceChanged)) {
+    setArt(placeholderArt(m.title + m.app, sourceColor));
   }
+  island.classList.toggle('artwork-accent', !!m.has);
 
-  if (m.has) {
+  if (m.has && (trackChanged || sourceChanged || m.album !== previous.album)) {
     $('#m-title').textContent = $('#p-title').textContent = m.title || 'Unknown';
     const sub = m.artist || m.album || appName(m.app);
     $('#m-artist').textContent = $('#p-artist').textContent = sub;
-    $('#p-eyebrow').textContent = appName(m.app) ? `Now Playing · ${appName(m.app)}` : 'Now Playing';
+    $('#p-eyebrow').textContent = `Now Playing · ${m.source?.name || appName(m.app) || 'Media'}`;
   }
-  $('#x-app-name').textContent = m.has ? appName(m.app) || 'Media' : 'Idle';
-  $('#v-media').classList.toggle('browser-src', m.has && BROWSERS.some((b) => (m.app || '').toLowerCase().includes(b)) && !(m.app || '').toLowerCase().includes('firefox'));
-  $('#v-media').classList.toggle('none', !m.has);
-  setPlayingUI(!!m.playing);
-  $('#m-progress').classList.toggle('hidden', !(m.dur > 0));
+  if (trackChanged || sourceChanged || m.has !== previous.has) {
+    $('#x-app-name').textContent = m.has ? m.source?.name || appName(m.app) || 'Media' : 'Idle';
+    $('#v-media').classList.toggle('browser-src', m.has && BROWSERS.some((b) => (m.app || '').toLowerCase().includes(b)) && !(m.app || '').toLowerCase().includes('firefox'));
+    $('#v-media').classList.toggle('none', !m.has);
+    window.dispatchEvent(new CustomEvent('island:media'));
+  }
+  if (!!m.playing !== !!previous.playing) setPlayingUI(!!m.playing);
+  if (m.has !== previous.has || (m.dur > 0) !== (previous.dur > 0)) $('#m-progress').classList.toggle('hidden', !(m.dur > 0));
 
   handleVolume(m);
   handleBrightness(m);
   render();
+  syncProgress();
 });
 
 function mediaPos() {
@@ -685,6 +900,7 @@ function mediaPos() {
 }
 
 const seek = makeSlider($('#m-bar'), {
+  onInput: () => tickProgress(),
   onCommit: (v) => {
     const m = state.media;
     if (!m.has || !(m.dur > 0)) return;
@@ -692,6 +908,7 @@ const seek = makeSlider($('#m-bar'), {
     bridge.mediaCmd(`seek ${sec.toFixed(1)}`);
     state.media.pos = sec;
     state.mediaAt = performance.now();
+    tickProgress();
   },
 });
 
@@ -699,9 +916,22 @@ function tickProgress() {
   const m = state.media;
   if (!m.has || !(m.dur > 0)) return;
   const pos = seek.dragging ? parseFloat($('#m-bar').getAttribute('aria-valuenow')) / 100 * m.dur : mediaPos();
-  $('#m-pos').textContent = fmt(pos);
-  $('#m-dur').textContent = `-${fmt(m.dur - pos)}`;
+  const elapsed = fmt(pos), remaining = `-${fmt(m.dur - pos)}`;
+  if ($('#m-pos').textContent !== elapsed) $('#m-pos').textContent = elapsed;
+  if ($('#m-dur').textContent !== remaining) $('#m-dur').textContent = remaining;
   if (!seek.dragging) seek.set(pos / m.dur);
+}
+
+let progressTimer = null;
+function syncProgress() {
+  const visible = state.visible && lastMode === 'expanded' && state.tab === 'media' && state.media.has;
+  if (visible) tickProgress();
+  if (visible && state.media.playing && state.media.dur > 0) {
+    if (progressTimer === null) progressTimer = setInterval(tickProgress, 250);
+  } else if (progressTimer !== null) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
 }
 
 $$('[data-cmd]').forEach((btn) =>
@@ -717,6 +947,7 @@ $$('[data-cmd]').forEach((btn) =>
       state.playLock = { value: state.media.playing, until: Date.now() + 1800 };
       setPlayingUI(state.media.playing);
       render();
+      syncProgress();
     }
   })
 );
@@ -773,6 +1004,7 @@ $('#vol-btn').addEventListener('click', () => {
   state.muted = !state.muted;
   state.volLockUntil = Date.now() + 900;
   showVolPct(state.vol ?? 0, state.muted);
+  syncAudioMeter();
   bridge.mediaCmd('mute');
 });
 
@@ -790,7 +1022,7 @@ function handleVolume(m) {
   if (typeof m.vol !== 'number') return;
   const locked = Date.now() < state.volLockUntil;
   const changed = state.vol !== null && (Math.abs(m.vol - state.vol) > 0.004 || !!m.muted !== state.muted);
-  if (locked) return;
+  if (locked || (m.vol === state.vol && !!m.muted === state.muted)) return;
   state.vol = m.vol;
   state.muted = !!m.muted;
   if (!volSlider.dragging) volSlider.set(m.vol);
@@ -811,8 +1043,9 @@ const brightSlider = makeSlider($('#bright-slider'), {
 
 function handleBrightness(m) {
   if (typeof m.bright !== 'number') return;
-  $('#bright-row').hidden = m.bright < 0;
-  if (m.bright < 0 || Date.now() < state.brightLockUntil) return;
+  const row = $('#bright-row');
+  if (row.hidden !== (m.bright < 0)) row.hidden = m.bright < 0;
+  if (m.bright < 0 || m.bright === state.bright || Date.now() < state.brightLockUntil) return;
   const changed = state.bright >= 0 && m.bright !== state.bright;
   state.bright = m.bright;
   if (!brightSlider.dragging) brightSlider.set(m.bright / 100);
@@ -822,9 +1055,17 @@ function handleBrightness(m) {
 
 // ---------------- toasts & HUD ----------------
 let toastTimer = null;
-// state.toastAction: what a click on the current toast does (set right after showToast)
-function showToast(kind, label, value, pct, ms = 3200) {
+function dismissToast() {
+  clearTimeout(toastTimer);
+  state.toast = null;
   state.toastAction = null;
+  state.toastUntil = 0;
+  render();
+  reportRect();
+  window.dispatchEvent(new Event('island:toast-end'));
+}
+function showToast(kind, label, value, pct, ms = 3200, action = null) {
+  state.toastAction = action;
   const t = $('.l-toast');
   t.className = `layer l-toast ${kind}`;
   $('#t-label').textContent = label;
@@ -833,13 +1074,14 @@ function showToast(kind, label, value, pct, ms = 3200) {
   $('.t-bar b').style.width = `${Math.round((pct ?? 0) * 100)}%`;
   // vertical variant
   $('.l-vtoast').className = `layer vlayer l-vtoast ${kind}`;
-  $('#vt-value').textContent = kind === 'done' ? 'Done' : value;
+  $('#vt-value').textContent = kind === 'kai-flow' ? label : kind === 'done' ? 'Done' : value;
   $('.v-bar b').style.height = `${Math.round((pct ?? 0) * 100)}%`;
   state.toast = kind;
   state.toastUntil = Date.now() + ms;
   render();
+  reportRect();
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(render, ms + 50);
+  toastTimer = setTimeout(dismissToast, ms + 50);
 }
 
 function showHud(kind, value, muted) {
@@ -991,10 +1233,10 @@ function startPhase(phase) {
   drawTimer();
   render();
   // Nova puts her headband on and opens her laptop
-  if (phase === 'focus' && feat('novaFocus')) {
+  if (phase === 'focus' && (window.phoenix?.style() !== 'classic' || feat('novaFocus'))) {
     $('.sc-laptop-time').textContent = `${min}:00`;
     window.playScene?.({
-      who: 'nova', props: ['band', 'laptop'], arms: 'type', tone: 'focus', badge: '🎯 Focus',
+      who: 'nova', phoenixPose:'focus', props: ['band', 'laptop'], arms: 'type', tone: 'focus', badge: '🎯 Focus',
       title: 'Focus time',
       sub: `<b>${min} min</b> of deep work — reminders stay quiet until it ends`,
       ms: 6000,
@@ -1029,8 +1271,8 @@ setInterval(() => {
       focus.round++;
       startPhase('break');
       const brk = Math.round(state.timer.total / 60);
-      const shown = feat('novaFocus') && window.playScene?.({
-        who: 'nova', props: ['band'], arms: 'rest', tone: 'focus', badge: '🎯 Focus',
+      const shown = (window.phoenix?.style() !== 'classic' || feat('novaFocus')) && window.playScene?.({
+        who: 'nova', phoenixPose:'focus-complete', phoenixSequence:[{pose:'celebration',at:3000},{pose:'break',at:5000}], props: ['band'], arms: 'rest', tone: 'focus', badge: '🎯 Focus',
         title: 'Well done! 🎉',
         sub: `Focus session <b>${focus.round}</b> done · <b>${brk} min</b> break`,
         ms: 8000,
@@ -1041,8 +1283,7 @@ setInterval(() => {
     } else {
       setTimer(state.features.focusMin || 25, null);
       island.classList.remove('focus-on', 'break-on');
-      showToast('done', 'Break over', 'Focus', 0, 9000);
-      state.toastAction = () => startPhase('focus');
+      showToast('done', 'Break over', 'Focus', 0, 9000, () => startPhase('focus'));
       beep();
     }
     return;
@@ -1063,26 +1304,22 @@ const TAB_FEATURE = { media: 'tabMedia', apps: 'tabApps', shelf: 'tabShelf', pra
 
 // Hide tabs that are switched off (Downloads shows itself only around download activity).
 function refreshTabs() {
-  let changed = false;
   $$('.tab').forEach((b) => {
     const t = b.dataset.tab;
     // Downloads shows itself around download activity, Radio only with its plugin
     const hide = t === 'downloads' ? !state.dl.tab : t === 'radio' ? !state.radioTab : !feat(TAB_FEATURE[t]);
-    if (b.hidden !== hide) {
-      b.hidden = hide;
-      changed = true;
-    }
+    if (b.hidden !== hide) b.hidden = hide;
   });
   if ($(`.tab[data-tab="${state.tab}"]`)?.hidden) {
     const first = [...$$('.tab')].find((b) => !b.hidden);
     if (first) selectTab(first.dataset.tab);
-  } else if (changed) {
-    placeSegThumb();
   }
+  placeSegThumb();
 }
 
 function applyFeatures(f) {
   state.features = f || {};
+  if (state.toast === 'kai-flow' && !state.features.kaiNotifications) state.toastUntil = 0;
   // performance options (or the battery saver): a solid island, and no movement
   document.body.classList.toggle('no-blur', state.features.noBlur === true);
   document.body.classList.toggle('no-anim', state.features.noAnimations === true);
@@ -1093,17 +1330,23 @@ function applyFeatures(f) {
   if ($('.info-slide.on')?.classList.contains('off')) showSlide(0);
   refreshTabs();
   render();
+  positionIsland();
   window.dispatchEvent(new CustomEvent('island:features', { detail: state.features }));
 }
 bridge.onFeatures(applyFeatures);
 // a screen recorder is running (NVIDIA Instant Replay, OBS): a glass theme turns solid until it's gone
 bridge.onRecording((on) => document.body.classList.toggle('th-rec', !!on));
 bridge.onSaver((s) => showToast('saver', s.on ? 'Battery saver is on' : 'Battery saver is off', s.pct >= 0 ? `${s.pct}%` : '', 0, 3500));
-bridge.onVisibility((v) => { state.visible = !!v; });
+bridge.onVisibility((v) => {
+  state.visible = !!v;
+  syncProgress();
+  syncAudioMeter();
+  if (v) reportRect();
+});
 bridge.features().then(applyFeatures);
 $('#open-settings').addEventListener('click', () => bridge.openSettings());
 
 selectTab('media');
+document.fonts.ready.then(() => placeSegThumb());
 drawTimer();
 render();
-wake(1500);

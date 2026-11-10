@@ -10,8 +10,7 @@
     let left = COUNTDOWN_S;
     // stays put under the cursor; a click just shows it again
     const show = () => {
-      showToast('updating', 'Updating · back in a few seconds', String(left), 0, left * 1000 + 600);
-      state.toastAction = show;
+      showToast('updating', 'Updating · back in a few seconds', String(left), 0, left * 1000 + 600, show);
     };
     show();
     timer = setInterval(() => {
@@ -28,7 +27,6 @@
 
   bridge.onUpdate((u) => {
     if (timer) return;
-    showToast('update', `Update ready · ${u.version}`, 'Update now', 0, 20000);
-    state.toastAction = countdown;
+    showToast('update', `Update ready · ${u.version}`, 'Update now', 0, 20000, countdown);
   });
 })();

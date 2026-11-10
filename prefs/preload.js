@@ -4,6 +4,13 @@ const on = (channel) => (cb) => ipcRenderer.on(channel, (_e, data) => cb(data));
 
 contextBridge.exposeInMainWorld('prefs', {
   features: () => ipcRenderer.invoke('features-get'),
+  spotifyStatus: () => ipcRenderer.invoke('spotify-status'),
+  onSpotify: on('spotify'),
+  connectSpotify: (clientId) => ipcRenderer.invoke('spotify-connect', clientId),
+  disconnectSpotify: () => ipcRenderer.invoke('spotify-disconnect'),
+  spotifyDashboard: () => ipcRenderer.send('spotify-dashboard'),
+  browserCompanionStatus: () => ipcRenderer.invoke('browser-companion-status'),
+  browserCompanionFolder: () => ipcRenderer.send('browser-companion-folder'),
   setFeatures: (patch) => ipcRenderer.send('features-set', patch),
   resetFeatures: () => ipcRenderer.send('features-reset'),
   onFeatures: on('features'),
@@ -12,6 +19,8 @@ contextBridge.exposeInMainWorld('prefs', {
   onGeneral: on('general'),
   window: (action) => ipcRenderer.send('prefs-window', action),
   previewReminder: () => ipcRenderer.send('reminder-preview'),
+  previewPhoenix: (id) => ipcRenderer.send('phoenix-preview', id),
+  previewKaiNotice: (kind) => ipcRenderer.send('kai-notice-preview', kind),
   bridgeStatus: () => ipcRenderer.invoke('bridge-status'),
   openLog: () => ipcRenderer.send('open-log'),
   copyReport: () => ipcRenderer.invoke('copy-report'),

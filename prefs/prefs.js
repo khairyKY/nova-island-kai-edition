@@ -3,6 +3,36 @@ const $$ = (s) => document.querySelectorAll(s);
 const api = window.prefs;
 
 let features = {};
+$('#phoenix-options').innerHTML = PhoenixStates.map(pose => `<div class="row phoenix-option" data-companion-pose="${pose.id}">
+  <label class="phoenix-state-label" for="${pose.key}"><img src="../${pose.src}" alt="" loading="lazy"><span class="txt"><b>${pose.label}</b><small>${pose.hint}</small></span></label>
+  <button class="btn" data-phoenix-preview="${pose.id}" aria-label="Preview ${pose.label.toLowerCase()}">Preview</button>
+  <input id="${pose.key}" type="checkbox" class="sw" data-feature="${pose.key}" aria-label="${pose.label} pose">
+</div>`).join('');
+$$('[data-companion-style]').forEach(button => button.addEventListener('click', () => { api.setFeatures({companionStyle:button.dataset.companionStyle});saved(); }));
+$$('[data-phoenix-preview]').forEach(button => button.addEventListener('click', () => { api.previewPhoenix(button.dataset.phoenixPreview);saved('Previewing pose'); }));
+let spotifyInfo = {};
+function showSpotify(value) {
+  spotifyInfo = value || {};
+  if (spotifyInfo.redirect) $('#spotify-redirect').textContent = spotifyInfo.redirect;
+  const input = $('#spotify-client-id');
+  if (document.activeElement !== input) input.value = spotifyInfo.clientId || '';
+  $('#spotify-status').textContent = spotifyInfo.error || spotifyInfo.lookupError || (spotifyInfo.connecting ? 'Finish signing in in your browser.' : spotifyInfo.connected ? 'Connected · save songs with the heart in Now Playing' : 'Connect your account to enable the heart in Now Playing');
+  $('#spotify-connect').disabled = !!spotifyInfo.connecting;
+  $('#spotify-connect').textContent = spotifyInfo.connected ? 'Reconnect' : 'Connect Spotify';
+  $('#spotify-disconnect').hidden = !spotifyInfo.connected && !spotifyInfo.connecting;
+}
+api.spotifyStatus().then(showSpotify);
+api.onSpotify(showSpotify);
+$('#spotify-connect').addEventListener('click', async () => {
+  const result = await api.connectSpotify($('#spotify-client-id').value.trim());
+  if (!result?.ok) $('#spotify-status').textContent = result?.error || 'Could not connect Spotify.';
+});
+$('#spotify-disconnect').addEventListener('click', () => api.disconnectSpotify());
+$('#spotify-dashboard').addEventListener('click', () => api.spotifyDashboard());
+api.browserCompanionStatus().then(value => {
+  $('#browser-companion-status').textContent = value?.connected ? 'Connected · playing sites can identify themselves' : 'Load the companion once to show YouTube and other site icons';
+});
+$('#browser-companion-folder').addEventListener('click', () => api.browserCompanionFolder());
 
 // ---- saved hint ----
 let savedTimer = null;
@@ -21,6 +51,10 @@ function nope(el) {
 
 // ---- themes: a gallery of live previews (colors from ../themes.css) ----
 const THEMES = [
+  ['kai-day', 'Kai’s Flow · Day Garden', 'Warm botanical glass with artwork colour'],
+  ['kai-night', 'Kai’s Flow · Night Garden', 'Violet glass, moonlight and artwork glow'],
+  ['kai-fern-day', 'Kai’s Flow · Pressed Fern Day', 'Sage, soft reflections and warm liquid glass'],
+  ['kai-fern-night', 'Kai’s Flow · Pressed Fern Night', 'Moonlit fern and violet liquid glass'],
   ['original', 'Original Nova', 'Liquid glass'],
   ['bakka', 'Bakka', 'Deep green and gold'],
   ['outline', 'Outline', 'Glass with a clean line'],
@@ -35,9 +69,9 @@ const THEMES = [
   ['lava', 'Lava', 'Glowing embers'],
   ['retro', 'Retro', 'Pixel green'],
 ];
-const GLASS_THEMES = ['original', 'outline', 'snow'];
+const GLASS_THEMES = ['original', 'outline', 'snow', 'kai-day', 'kai-night', 'kai-fern-day', 'kai-fern-night'];
 $('#themes').innerHTML = THEMES.map(([id, name, desc]) => `
-  <button class="th-card" role="radio" data-theme="${id}" aria-checked="false">
+  <button class="th-card" role="radio" data-theme="${id}" aria-checked="false" ${id.startsWith('kai-') ? 'hidden' : ''}>
     <span class="th-stage">
       <span class="th-pill"><i class="th-ear l"></i><i class="th-ear r"></i><b>9:41</b><span>☀ 24°</span></span>
       <span class="th-pill wide"><i class="th-ear l"></i><i class="th-ear r"></i><i class="th-art"></i><span class="th-song">Golden Hour</span><i class="th-eq"><i></i><i></i><i></i><i></i></i></span>
@@ -56,8 +90,31 @@ $('#themes').addEventListener('click', (e) => {
 // ---- feature switches ----
 function showFeatures(f) {
   features = f;
-  $$('.th-card').forEach((c) => c.setAttribute('aria-checked', String(c.dataset.theme === (f.theme || 'original'))));
+  const companion = f.companionStyle || 'phoenix';
+  $$('[data-companion-style]').forEach(button => button.setAttribute('aria-checked',String(button.dataset.companionStyle === companion)));
+  $('#phoenix-settings').hidden = !PhoenixStates.usesArtwork(companion);
+  $('#companion-state-heading').textContent = PhoenixStates.isZaher(companion) ? 'Zaher states' : 'Phoenix states';
+  const standing = companion === 'zaher-standing';
+  $('#zaher-standing-hint').hidden = !standing;
+  for (const pose of PhoenixStates) {
+    const row = $(`[data-companion-pose="${pose.id}"]`);
+    row.hidden = standing && pose.id.startsWith('idle-');
+    const src = `../${PhoenixStates.sourceFor(pose,companion)}`;
+    const image = row.querySelector('img');
+    if (image.getAttribute('src') !== src) image.src = src;
+  }
+  $('#classic-companion-settings').hidden = companion !== 'classic';
+  $('#local-update-note').hidden = !f.localBuild;
+  $('[data-feature="autoUpdate"]').disabled = !!f.localBuild;
+  $('#kai-notice-settings').hidden = !f.kaiPlugin;
+  $$('[data-kai-style]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.kaiStyle === f.kaiNoticeStyle)));
+  $$('[data-kai-preview]').forEach((b) => { b.disabled = !f.kaiNotifications; });
+  $$('.th-card').forEach((c) => {
+    c.hidden = c.dataset.theme.startsWith('kai-') && !f.kaiPlugin;
+    c.setAttribute('aria-checked', String(c.dataset.theme === (f.theme || 'original')));
+  });
   $$('[data-feature]').forEach((el) => { el.checked = !!f[el.dataset.feature]; });
+  if (f.localBuild) $('[data-feature="autoUpdate"]').checked = false;
   // child settings show only while every switch they depend on is on ("!key": while it is off)
   $$('[data-needs]').forEach((el) => el.classList.toggle('off', !el.dataset.needs.split(' ').every((k) => (k[0] === '!' ? !f[k.slice(1)] : f[k]))));
   // in the browser: the address bar, or stay in place with clicks passing through
@@ -67,6 +124,11 @@ function showFeatures(f) {
     : 'Stays where it is; clicks go to the tabs below';
   showSteppers();
 }
+$$('[data-kai-style]').forEach((b) => b.addEventListener('click', () => {
+  api.setFeatures({ kaiNoticeStyle: b.dataset.kaiStyle });
+  saved();
+}));
+$$('[data-kai-preview]').forEach((b) => b.addEventListener('click', () => api.previewKaiNotice(b.dataset.kaiPreview)));
 $$('[data-browser]').forEach((b) => b.addEventListener('click', () => {
   api.setFeatures({ addrIsland: b.dataset.browser === 'addr' });
   saved();
@@ -348,6 +410,7 @@ let plugData = { plugins: [], error: '' };
 const plugProgress = {}; // id -> 0..1 while installing
 const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 const PLUG_ICON = '<svg viewBox="0 0 24 24"><path d="M4 9.5 18 4M3 9h18v11H3z"/><circle cx="8" cy="14.5" r="2.5"/><path d="M14 13h4M14 16h4"/></svg>';
+const KAI_PLUG_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4c-6.5 0-14 2.8-14 9a5 5 0 0 0 5 5c6.2 0 9-7.5 9-14Z"/><path d="M4 20 14 10"/></svg>';
 
 function plugSettings(p) {
   return (p.settings || []).map((s) => {
@@ -374,13 +437,14 @@ function showPlugins(data = plugData) {
     return;
   }
   box.innerHTML = rows.map((p) => {
+    const icon = p.id === 'kais-flow' ? KAI_PLUG_ICON : PLUG_ICON;
     const pct = plugProgress[p.id];
     const meta = [p.installs != null ? `⬇ ${p.installs.toLocaleString('en-US')} installs` : '', `v${p.installed || p.version}`, p.size ? fmtSize(p.size) : ''].filter(Boolean).join(' · ');
     const action = pct != null || p.busy ? '<button class="btn" disabled>Installing…</button>'
       : !p.installed ? `<button class="btn accent" data-plug-install="${esc(p.id)}">Install</button>`
       : `${p.update ? `<button class="btn accent" data-plug-install="${esc(p.id)}">Update</button>` : ''}<input type="checkbox" class="sw" data-plug-enable="${esc(p.id)}" ${p.enabled ? 'checked' : ''} aria-label="On"><button class="btn danger" data-plug-remove="${esc(p.id)}">Remove</button>`;
     return `<div class="plug" data-plug="${esc(p.id)}">
-      <div class="row"><span class="plug-ico">${PLUG_ICON}</span><div class="txt"><b>${esc(p.name)} <i class="badge free">Free</i></b><small>${esc(p.description)}</small><small class="meta">${esc(meta)}</small></div><div class="btns">${action}</div></div>
+      <div class="row"><span class="plug-ico">${icon}</span><div class="txt"><b>${esc(p.name)} <i class="badge free">Free</i></b><small>${esc(p.description)}</small><small class="meta">${esc(meta)}</small></div><div class="btns">${action}</div></div>
       ${pct != null ? `<div class="plug-bar-line"><b data-pct="${Math.round(pct * 100)}"></b></div>` : ''}
       ${p.installed && p.enabled ? plugSettings(p) : ''}
     </div>`;

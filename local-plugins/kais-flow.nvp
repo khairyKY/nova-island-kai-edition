@@ -1,0 +1,33 @@
+{
+  "manifest": {
+    "id": "kais-flow",
+    "kind": "kai-flow",
+    "version": "1.0.0",
+    "name": "Kai’s Flow",
+    "description": "Interactive browser docking, Alt+Tab behavior, Garden themes, and Kai’s Flow alerts.",
+    "settings": [
+      {
+        "key": "operaDocking",
+        "type": "bool",
+        "label": "Opera GX docking",
+        "hint": "Use the GX toolbar slot and open the island on hover.",
+        "default": true
+      },
+      {
+        "key": "taskSwitcher",
+        "type": "bool",
+        "label": "Alt+Tab behavior",
+        "hint": "Hide during task switching and restore the new window’s layout.",
+        "default": true
+      },
+      {
+        "key": "notifications",
+        "type": "bool",
+        "label": "Kai’s Flow notifications",
+        "hint": "Mirror local focus and task reminder alerts.",
+        "default": true
+      }
+    ]
+  },
+  "sig": "UVFiKlXIzT1vUB14tcbjFUnOst/B16rZvJCeTPNmtEXGveDQipip66aySnDE7QTMLj3OAF8YGm6lzNj9HvkVAA=="
+}

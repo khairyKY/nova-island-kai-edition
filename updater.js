@@ -3,6 +3,8 @@
 // update that is never accepted is installed when the app quits. Only the installed app updates.
 const { app } = require('electron');
 const log = require('./log');
+// This personal build has local code and a local plugin trust key. A stock installer replaces both.
+const LOCAL_BUILD = require('./package.json').novaLocalBuild === true;
 
 const FIRST_CHECK_MS = 60 * 1000;
 const EVERY_MS = 6 * 60 * 60 * 1000;
@@ -48,6 +50,7 @@ function retrySoon() {
 
 function start(sendFn, on) {
   send = sendFn;
+  if (LOCAL_BUILD) { log.info('stock updates disabled for personal Kai build'); return; }
   // the Microsoft Store version is updated by the Store
   if (!app.isPackaged || process.windowsStore) return;
   ({ autoUpdater: updater } = require('electron-updater'));
@@ -66,7 +69,7 @@ function start(sendFn, on) {
 }
 
 function setEnabled(on) {
-  enabled = !!on;
+  enabled = !LOCAL_BUILD && !!on;
   if (updater) updater.autoInstallOnAppQuit = enabled;
   clearTimeout(timer);
   clearInterval(timer);
@@ -79,7 +82,7 @@ function setEnabled(on) {
 
 // restart into the downloaded version (silent install, then the app starts again)
 function install() {
-  if (!ready || !updater) return;
+  if (LOCAL_BUILD || !ready || !updater) return;
   log.info(`update ${ready} installing, will reopen`);
   updater.quitAndInstall(true, true);
 }

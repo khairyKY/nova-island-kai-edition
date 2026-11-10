@@ -11,7 +11,7 @@
 
   function apply() {
     const lingered = near && Date.now() - nearSince >= DWELL_MS;
-    const show = feat('novaEyes') && !light() && !anchor.vertical && lingered && !state.hover && lastMode === 'idle';
+    const show = state.features.companionStyle === 'classic' && feat('novaEyes') && !light() && !anchor.vertical && lingered && !state.hover && lastMode === 'idle';
     island.classList.toggle('eyes', !!show);
   }
 

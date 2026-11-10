@@ -1,0 +1,24 @@
+/* The artwork stays inside the island's existing window and hit-test bounds. */
+.l-phoenix-idle { display: grid; place-items: center; }
+#phoenix-idle { width: 40px; height: 31px; object-fit: contain; pointer-events: none; }
+#island.idle.phoenix-idle :is(.l-info,.l-vinfo) { opacity: 0; filter: blur(3px); pointer-events: none; }
+#island.idle.phoenix-idle .l-phoenix-idle { opacity: 1; filter: none; transform: none; }
+#island.vertical.idle #phoenix-idle { width: 42px; height: 44px; }
+.phoenix-scene { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 8; opacity: 0; pointer-events: none; }
+body #island.scene.sc-phoenix { --w: 140px; --h: 140px; }
+body #island.scene.sc-phoenix.sc-zaher { --w: 120px; --h: 142px; }
+body #island.scene.sc-plain { --w: 1px; --h: 1px; opacity: 0; pointer-events: none; }
+body #island.scene:is(.sc-phoenix,.sc-plain) .clip { background: transparent; box-shadow: none; clip-path: none; overflow: visible; }
+body #island.scene:is(.sc-phoenix,.sc-plain) .clip::before,
+body #island.scene:is(.sc-phoenix,.sc-plain) .clip::after,
+body #island.scene:is(.sc-phoenix,.sc-plain) .clip > *,
+body #island.scene:is(.sc-phoenix,.sc-plain) .sc { visibility: hidden; }
+body #island.scene.sc-phoenix .phoenix-scene { opacity: 1; filter: drop-shadow(0 5px 8px rgba(30,18,8,.16)); animation: phoenix-arrive .36s var(--spring-soft); }
+body.phoenix-scene-active .scene-card { width: 390px; min-height: 148px; max-height: calc(100% - 16px); border-radius: 24px; }
+body.phoenix-scene-active .scene-card .sc-title:not(.quran) { font: 600 22px/1.25 var(--font); }
+body.phoenix-scene-active .scene-card .sc-sub { font-size: 13px; line-height: 1.5; }
+body.phoenix-scene-active .scene-card .sc-sub .ln { display: block; }
+body.phoenix-scene-active .scene-card .sc-sub .ln b { color: var(--text-1); }
+@keyframes phoenix-arrive { from { opacity: 0; transform: translateY(7px) scale(.95); } to { opacity: 1; transform: none; } }
+body.no-anim #island .phoenix-scene { animation: none; }
+@media (prefers-reduced-motion: reduce) { #island .phoenix-scene { animation: none; } }

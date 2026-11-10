@@ -5,3 +5,6 @@ __pycache__/
 promo/src/out/
 promo/src/scenes/_*.html
 promo/src/prefs.html
+
+# local generation metadata (has local paths)
+assets/*/generation.json

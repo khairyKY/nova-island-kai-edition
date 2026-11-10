@@ -49,8 +49,7 @@
     if (!next || !free()) return;
     const item = next;
     next = null;
-    showToast(`news ${item.type}`, item.title, item.link ? 'Open' : '', 0, 30000);
-    if (item.link) state.toastAction = () => bridge.newsOpen(item.id);
+    showToast(`news ${item.type}`, item.title, item.link ? 'Open' : '', 0, 30000, item.link ? () => bridge.newsOpen(item.id) : null);
     bridge.newsShown(item.id);
   }
   setInterval(tryShow, 5000);

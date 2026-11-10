@@ -37,9 +37,8 @@
       const startId = `${ev.id}|start`;
       if (left <= 0 && left > -60000 && !fired.has(startId)) {
         fired.add(startId);
-        showToast('meet-now', ev.title, ev.link ? 'Join' : 'Now', 0, 12000);
+        showToast('meet-now', ev.title, ev.link ? 'Join' : 'Now', 0, 12000, ev.link ? () => bridge.openMeeting(ev.link) : null);
         note('📅', `Meeting started: ${ev.title}`);
-        if (ev.link) state.toastAction = () => bridge.openMeeting(ev.link);
         island.classList.add('meet-flash');
         setTimeout(() => island.classList.remove('meet-flash'), 12200);
         playTones([[0, 660], [0.18, 880]], { peak: 0.16, decay: 0.5 });

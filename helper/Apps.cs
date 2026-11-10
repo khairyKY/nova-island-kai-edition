@@ -1,15 +1,54 @@
 // `nova-helper apps`: the Start menu's apps as JSON, [{ name, id, icon, kind }] (was apps.ps1).
 //   id   = AppUserModelID from the shell's AppsFolder (launched with shell:AppsFolder\<id>)
 //   kind = 'png' (Store app logo file) | 'file' (exe/lnk to take the icon from) | ''
+//   image = embedded PNG data URL when an icon resource can be read directly
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Xml;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
 static class Apps {
+  [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+  static extern int SHDefExtractIcon(string file, int index, uint flags, out IntPtr large, IntPtr small, uint size);
+  [DllImport("user32.dll")]
+  static extern bool DestroyIcon(IntPtr icon);
+
+  // Read the app's actual icon resource, bypassing stale generic Shell icon-cache entries.
+  static string ResourceIcon(string file, int index) {
+    IntPtr handle = IntPtr.Zero;
+    try {
+      if (!File.Exists(file) || SHDefExtractIcon(file, index, 0, out handle, IntPtr.Zero, 64) != 0 || handle == IntPtr.Zero) return "";
+      using (var icon = Icon.FromHandle(handle))
+      using (var bitmap = icon.ToBitmap())
+      using (var stream = new MemoryStream()) {
+        bitmap.Save(stream, ImageFormat.Png);
+        return "data:image/png;base64," + Convert.ToBase64String(stream.ToArray());
+      }
+    } catch { return ""; }
+    finally { if (handle != IntPtr.Zero) DestroyIcon(handle); }
+  }
+
+  static string ShortcutImage(dynamic wsh, string link) {
+    try {
+      string location = wsh.CreateShortcut(link).IconLocation;
+      int index = 0;
+      int comma = location.LastIndexOf(',');
+      int parsed;
+      if (comma >= 0 && int.TryParse(location.Substring(comma + 1).Trim(), out parsed)) {
+        index = parsed;
+        location = location.Substring(0, comma);
+      }
+      location = Environment.ExpandEnvironmentVariables(location.Trim().Trim('"'));
+      return ResourceIcon(location, index);
+    } catch { return ""; }
+  }
+
   // package family name -> install folder, from the per-user package repository
   static Dictionary<string, string> Packages() {
     var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -119,7 +158,7 @@ static class Apps {
       string name = item.Name;
       string id = item.Path;
       if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(id) || !seen.Add(id)) continue;
-      string icon = "", kind = "";
+      string icon = "", kind = "", image = "";
       int bang = id.IndexOf('!');
       string loc;
       if (bang > 0 && packages.TryGetValue(id.Substring(0, bang), out loc)) {
@@ -132,9 +171,11 @@ static class Apps {
         // a shortcut may point to a folder too (e.g. "XAMPP htdocs folder")
         icon = !string.IsNullOrEmpty(target) && (File.Exists(target) || Directory.Exists(target)) ? target : lnk;
         kind = "file";
+        image = ShortcutImage(wsh, lnk);
       }
       if (icon == "" && File.Exists(id)) { icon = id; kind = "file"; }
-      rows.Add("{\"name\":" + Str(name) + ",\"id\":" + Str(id) + ",\"icon\":" + Str(icon) + ",\"kind\":" + Str(kind) + "}");
+      if (image == "" && kind == "file") image = ResourceIcon(icon, 0);
+      rows.Add("{\"name\":" + Str(name) + ",\"id\":" + Str(id) + ",\"icon\":" + Str(icon) + ",\"kind\":" + Str(kind) + ",\"image\":" + Str(image) + "}");
     }
     outw.WriteLine("[" + string.Join(",", rows) + "]");
   }

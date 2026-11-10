@@ -1,0 +1,255 @@
+/* Pressed Fern is an additional pair of solid Kai's Flow themes. */
+body[data-theme="kai-fern-day"] {
+  color-scheme: light;
+  --text-3: #6a6354;
+  --accent-rgb: 77, 102, 80;
+  --fill-1: #4d665017; --fill-2: #4d665029; --fill-3: #4d66503b;
+  --card: #4d665009; --card-stroke: #4d66502b;
+  --green: #4d6650; --orange: #85551d; --red: #91432d; --yellow: #7f6428;
+  --dl-rgb: 36, 91, 132;
+  --fern-track: #cfd3c2;
+  --fern-shadow: #34281a40;
+  --fern-radio-ink: #3c6045;
+  --fern-link: #245b84;
+}
+body[data-theme="kai-fern-night"] {
+  color-scheme: dark;
+  --text-3: #b6aec7;
+  --accent-rgb: 198, 216, 186;
+  --fill-1: #c6d8ba17; --fill-2: #c6d8ba29; --fill-3: #c6d8ba3b;
+  --card: #c6d8ba0b; --card-stroke: #c6d8ba2b;
+  --green: #c6d8ba; --orange: #e4c36b; --red: #efab96; --yellow: #e4c36b;
+  --dl-rgb: 139, 211, 242;
+  --fern-track: #535461;
+  --fern-shadow: #0e0b16aa;
+  --fern-radio-ink: #c6d8ba;
+  --fern-link: #a8cdff;
+}
+
+body:is([data-theme="kai-fern-day"], [data-theme="kai-fern-night"]) {
+  & .clip { box-shadow: 0 6px 18px -6px var(--fern-shadow); }
+  & #island.expanded { --r: 24px; }
+  & #island.peek { --r: 23px; }
+  & #island.reminder { --r: 26px; }
+  & #island:is(.expanded, .peek) .clip {
+    box-shadow: 0 8px 24px var(--fern-shadow);
+  }
+  & #island:is(.expanded, .peek, .reminder) .glow { opacity: 0; }
+
+  /* A static mask keeps the fern crisp at every display scale. */
+  & #island:is(.expanded, .peek, .reminder, .kai-notice) .clip::before,
+  & .scene-card::after {
+    content: "";
+    position: absolute;
+    z-index: 3;
+    width: 77px;
+    height: 110px;
+    inset: auto 3px 9px auto;
+    background: var(--fern-leaf);
+    mask: url("assets/pressed-fern.svg") center / contain no-repeat;
+    opacity: .66;
+    transform: rotate(13deg) scale(.86);
+    transform-origin: right bottom;
+    pointer-events: none;
+  }
+  & #island.reminder .clip::before {
+    inset: auto auto 14px 18px;
+    transform: rotate(-29deg) scale(.8);
+    transform-origin: center;
+    opacity: .63;
+  }
+  & #island.peek .clip::before {
+    right: 55px;
+    bottom: 4px;
+    transform: rotate(13deg) scale(.45);
+    opacity: .45;
+  }
+  & #island.kai-notice .clip::before {
+    right: 8px;
+    bottom: 1px;
+    transform: rotate(20deg) scale(.42);
+    opacity: .48;
+  }
+  & #island.vertical .clip::before { display: none; }
+  & .l-expanded { padding: 10px 17px 16px; }
+  & .topbar {
+    position: relative;
+    grid-template-columns: minmax(28px, 1fr) auto auto;
+    column-gap: 7px;
+    margin-bottom: 14px;
+  }
+  & .topbar::after {
+    content: "";
+    position: absolute;
+    inset: auto -17px -7px;
+    border-bottom: 1px solid var(--th-line);
+    pointer-events: none;
+  }
+  & .chip {
+    max-width: 100%;
+    min-width: 0;
+    padding-inline: 7px;
+    gap: 5px;
+    color: var(--th-hi);
+    background: var(--fill-1);
+    box-shadow: inset 0 0 0 1px var(--th-line);
+  }
+  & .chip .dot {
+    width: 10px;
+    height: 7px;
+    border-radius: 80% 0 80% 0;
+    transform: rotate(-32deg);
+    background: var(--th-hi);
+    box-shadow: none;
+  }
+  & .seg { gap: 1px; background: transparent; box-shadow: none; }
+  & .tab { padding-inline: 6px; }
+  & .tab.active { color: var(--th-hi); gap: 5px; padding-right: 9px; }
+  & .seg-thumb { background: var(--fill-1); box-shadow: none; }
+  & .tab:hover:not(.active) { background: var(--fill-1); }
+  & .clock { gap: 4px; }
+  & .clock-time b { font-size: 12px; }
+  & :is(button, input, .slider):focus-visible {
+    outline-color: var(--th-hi);
+    outline-offset: 2px;
+  }
+  & :is(.pill.primary, .rd-pick) {
+    color: var(--th-hi);
+    background: var(--fill-1);
+    box-shadow: inset 0 0 0 1px var(--th-line);
+  }
+  & :is(.pill.primary, .rd-pick):hover { background: var(--fill-2); }
+  & .card { border-radius: 14px; }
+  & .title { font-family: Georgia, "Segoe UI", serif; font-weight: 500; }
+  & .rd-name { font-family: var(--font); }
+  & :is(.bar, .i-bar, .t-bar, .v-bar, .dl-bar, .rm-time, .sc-bar) {
+    background: var(--fern-track);
+  }
+  & :is(.ring .track, .c-ring .trk) { stroke: var(--fern-track); }
+  & :is(.ring .fill, .c-ring .val) { stroke: var(--th-hi); }
+  & .c-ring .arr { stroke: var(--text-1); }
+  & :is(.bar b, .i-bar b, .t-bar b, .v-bar b) { background: var(--th-hi); }
+  & :is(.bar, .i-bar) b.warn { background: var(--orange); }
+  & :is(.bar, .i-bar) b.hot { background: var(--red); }
+  & .slider::before { background: var(--fern-track); box-shadow: none; }
+  & .slider .fill { background: var(--th-hi); }
+  & .slider .knob {
+    background: var(--th-hi);
+    border: 2px solid var(--th-bg);
+    box-shadow: 0 0 0 1px var(--th-hi);
+    transform: scale(1);
+  }
+  & .batt { border-color: var(--text-2); }
+  & .batt::after { background: var(--text-2); }
+  & .batt b { background: var(--th-hi); }
+  & .l-toast.charging .batt b { background: var(--green); }
+  & .l-toast.low .batt b { background: var(--red); }
+  & .eq i { background: var(--th-hi); box-shadow: none; }
+  & :is(.rd-eyebrow, .rd-group, .i-onair, .pr-radio.on) { color: var(--fern-radio-ink); }
+  & .rd-art { background: linear-gradient(152deg, #607c55, #253e2b); border-radius: 20px; }
+  & .rd-picker {
+    background: var(--th-bg);
+    box-shadow: inset 0 0 0 1px var(--th-line), 0 12px 30px var(--fern-shadow);
+  }
+  & .rd-list .pick { background: var(--fill-1); }
+  & .rd-list .pick:hover { background: var(--fill-2); }
+  & .rd-list .pick.sel {
+    background: var(--fill-2);
+    color: var(--th-hi);
+    box-shadow: inset 0 0 0 1px var(--th-line);
+  }
+  & .rd-list .pick.sel::before { background: var(--th-hi); }
+  & .pr-radio.on, & .pr-row.next { background: var(--fill-2); }
+  & .pr-row.next { box-shadow: inset 0 0 0 1px var(--th-line); }
+  & .pr-next { background: var(--fill-1); }
+  & .pr-next .eyebrow, & .pr-bell.on { color: var(--yellow); }
+  & :is(.i-moon, .v-pr .i-soft, .pr-ramadan, .clip-math .ico-calc),
+  & :is(.l-toast, .l-vtoast):is(.prayer, .prayer-soon) .ico-moon,
+  & .pr-row.iftar b::after, & .l-toast.prayer #t-label { color: var(--yellow); }
+  & :is(.wx, .wx.night) { background: var(--fill-1); }
+  & :is(.meet .ico-cal, .meet-now .ico-cal, .clip-url .ico-link),
+  & .l-toast.meet #t-value { color: var(--fern-link); }
+  & :is(.net-row.off #net-val, .dl-row.error .dl-meta),
+  & .l-toast.net-off #t-label { color: var(--red); }
+  & :is(.l-toast, .l-vtoast).privacy-mic .ico-mic,
+  & .pv-row #pv-apps, & .presets button.sel small { color: var(--orange); }
+  & :is(.l-toast, .l-vtoast).privacy-cam .ico-cam { color: var(--green); }
+  & .focus-btn { color: var(--th-hi); background: var(--fill-1); }
+  & .focus-btn:hover { background: var(--fill-2); }
+  & .focus-btn.sel { color: var(--th-bg); background: var(--th-hi); }
+  & #island.focus-on :is(#tm-ring, .c-time, .c-ico) { color: var(--th-hi); stroke: var(--th-hi); }
+  & .l-toast:is(.shot, .update, .news) #t-value:not(:empty) {
+    background: var(--th-hi);
+    color: var(--th-bg);
+  }
+  & .pip .spin { border-color: var(--fern-track); border-top-color: var(--th-hi); }
+  & .eyes .eye { background: var(--th-hi); }
+  & .eyes .eye b { background: var(--th-bg); }
+
+  & .l-reminder { --rm-rgb: var(--accent-rgb); }
+  & .rm-text {
+    color: var(--text-1);
+    text-shadow: none;
+  }
+  & .rm-text.ui .ln b { color: var(--text-1); }
+  & .rm-badge, & .sc-badge {
+    color: var(--th-hi);
+    background: var(--fill-1);
+    box-shadow: inset 0 0 0 1px var(--th-line);
+  }
+  & .rm-x, & .sc-x {
+    color: var(--th-hi);
+    background: var(--fill-1);
+    box-shadow: inset 0 0 0 1px var(--th-line);
+  }
+  & .rm-x:hover, & .sc-x:hover { background: var(--fill-2); }
+  & .rm-ref { font-size: 12px; line-height: 16px; font-weight: 600; }
+  & .rm-time { height: 2px; bottom: 8px; }
+  & .rm-time b { background: var(--th-hi); box-shadow: none; }
+  & .scene-card {
+    --sc-rgb: var(--accent-rgb);
+    background: var(--th-bg);
+    border-radius: 24px;
+    box-shadow: inset 0 0 0 1px var(--th-line), 0 12px 30px var(--fern-shadow);
+  }
+  & .scene-card::before { background: var(--th-deco); }
+  & .scene-card::after { z-index: 0; right: 14px; opacity: .5; transform: rotate(18deg) scale(.7); }
+  & :is(.sc-title, .sc-sub, .sc-btn) { position: relative; z-index: 1; }
+  & .sc-title:not(.quran) { font-family: Georgia, "Segoe UI", serif; font-weight: 500; }
+  & .sc-title.quran { color: var(--text-1); text-shadow: none; }
+  & .sc-btn { background: var(--th-hi); color: var(--th-bg); }
+  & #island.sc-nova .skin {
+    background: radial-gradient(60% 50% at 32% 25%, var(--fill-3), transparent 70%), var(--th-bg);
+    box-shadow: inset 0 0 0 1px var(--th-line), 0 5px 14px var(--fern-shadow);
+  }
+  & .sc-face .eye, & .sc-face .mouth { background: var(--th-hi); }
+  & .sc-face .eye { box-shadow: none; }
+  & .sc-face .eye b { background: var(--th-bg); }
+  & .sc-face .smile { border-color: var(--th-hi); }
+  & #island.sc-nova .sc-limbs { --limb: var(--th-hi); --arm: var(--fern-leaf); }
+  & #island.kai-notice {
+    --kai-notice-paper: var(--th-bg);
+    --kai-notice-ink: var(--text-1);
+    --kai-notice-muted: var(--text-2);
+    --kai-notice-accent: var(--th-hi);
+  }
+  & #island.kai-notice .l-toast, & #island.kai-notice .l-vtoast { background: transparent; }
+  & .l-toast.kai-flow #t-label { font: 500 17px/1.2 Georgia, "Segoe UI", serif; }
+  & .l-toast.kai-flow::before { font-size: 10px; letter-spacing: .085em; font-weight: 600; }
+}
+
+.th-card:is([data-theme="kai-fern-day"], [data-theme="kai-fern-night"]) {
+  & .th-stage { background: var(--th-prev); }
+  & .th-pill.wide { height: 33px; }
+  & .th-pill.wide::before {
+    content: "";
+    position: absolute;
+    inset: auto 7px 1px auto;
+    width: 25px;
+    height: 33px;
+    background: var(--fern-leaf);
+    mask: url("assets/pressed-fern.svg") center / contain no-repeat;
+    opacity: .65;
+    pointer-events: none;
+  }
+}

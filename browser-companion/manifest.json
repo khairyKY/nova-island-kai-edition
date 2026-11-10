@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Nova Island · Media Sources",
+  "version": "1.0.0",
+  "description": "Identify the site playing media in Nova Island without switching tabs.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAredAgpzu6/2FBQjpbtwfDgZh0Hbqs45spH3V98hE3DebpDMkhBvKf4dmKn9/pLL7CsA0blryGq9jXcKWkgisS2x8bW0Trb/je1/C+VaWFgD6gLsNqMDe0fxL3G/GQYV6zQFKnMJvRFGkaVCvu+YEztMasJZFM8HkgRz+yKvGIKx4ukKz4z8dYgBL0B3/VUuGsX8scPpkKhYcoEIWTqf2DxwZlHaeMq1EWG3qL8Hm6jRfxq9e82j/Ywc1vLzM2A1gh6uKYocelNZwpkHxtMqL2fhBZ2Ihy1MtmMgMYFOUeHLHqwp3JqogNw5TM3NRdqp8/PRJLCQBQrJbsIBmIs4wwwIDAQAB",
+  "permissions": [
+    "nativeMessaging",
+    "tabs",
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://*.youtube.com/*",
+    "https://open.spotify.com/*",
+    "https://music.apple.com/*",
+    "https://*.soundcloud.com/*",
+    "https://*.vimeo.com/*",
+    "https://*.twitch.tv/*"
+  ],
+  "background": {
+    "service_worker": "worker.js"
+  },
+  "action": {
+    "default_title": "Nova Island media companion"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.youtube.com/*",
+        "https://open.spotify.com/*",
+        "https://music.apple.com/*",
+        "https://*.soundcloud.com/*",
+        "https://*.vimeo.com/*",
+        "https://*.twitch.tv/*"
+      ],
+      "js": [
+        "media.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "incognito": "not_allowed"
+}

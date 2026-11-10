@@ -1,18 +1,31 @@
 const {
-  app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, globalShortcut, desktopCapturer, shell, dialog, powerMonitor,
+  app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, globalShortcut, shell, dialog, powerMonitor, safeStorage,
 } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
-// One data folder for the installed app ("Dynamic Nova") and dev runs ("dynamic-nova"), so
-// settings, apps and caches carry over, and the single-instance lock covers both. Must run
-// before any module below reads app.getPath('userData').
-app.setPath('userData', path.join(app.getPath('appData'), 'dynamic-nova'));
+// Kai Edition keeps its own data folder, so it never shares settings or the single-instance lock
+// with the original Nova Island on the same PC. The first run copies the original's folder
+// (settings, pinned apps, prayer place), minus caches and lock files. Must run before any module
+// below reads app.getPath('userData').
+{
+  const own = path.join(app.getPath('appData'), 'nova-island-kai');
+  const original = path.join(app.getPath('appData'), 'dynamic-nova');
+  if (!fs.existsSync(own) && fs.existsSync(original)) {
+    const SKIP = /^(Cache|Code Cache|GPUCache|DawnCache|DawnGraphiteCache|GrShaderCache|ShaderCache|blob_storage|Crashpad|Singleton.*|lockfile|LOCK|.*\.log)$/i;
+    for (const name of fs.readdirSync(original)) {
+      if (SKIP.test(name)) continue;
+      try { fs.cpSync(path.join(original, name), path.join(own, name), { recursive: true, filter: (src) => !SKIP.test(path.basename(src)) }); } catch {}
+    }
+  }
+  app.setPath('userData', own);
+}
 const log = require('./log');
 log.init();
 
 const settings = require('./settings');
+const otherNova = require('./other-nova');
 const apps = require('./apps');
 const shelf = require('./shelf');
 const system = require('./system');
@@ -20,6 +33,7 @@ const mini = require('./mini');
 const prayer = require('./prayer');
 const downloads = require('./downloads');
 const features = require('./features');
+const companionStates = require('./phoenix-states');
 const privacy = require('./privacy');
 const calendar = require('./calendar');
 const network = require('./network');
@@ -27,6 +41,17 @@ const prefsWindow = require('./prefs-window');
 const updater = require('./updater');
 const news = require('./news');
 const plugins = require('./plugins');
+const { createBrowserBridge } = require('./browser-media');
+const { resolve: resolveMediaSource } = require('./media-sources');
+const { createSpotify } = require('./spotify');
+const { stripBackdrop } = require('./backdrop');
+const browserCompanion = require('./browser-companion-setup');
+const { createNoticeBridge } = require('./kai-notices');
+const kaiNotices = createNoticeBridge(
+  path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'KaiFlowIsland'),
+  (notice) => { if (win && !win.isDestroyed() && !screenLocked) send('kai-notice', notice); },
+  (err) => log.info(`[kai-notices] ${err.code || err.message}`)
+);
 
 // Keep our own windows (the mini player) out of Windows' media sessions, so the island and
 // the per-app commands keep targeting the browser tab rather than the mini player.
@@ -34,14 +59,52 @@ app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling');
 
 const WIN_W = 640;
 const WIN_H = 320;
-const HOVER_INTENT_MS = 280;
+const PANEL_W = 548; // expanded island, in renderer.js and style.css
+const PANEL_H = 232;
+// the cursor has to rest on the island this long before it opens, so passing over it (on the way to
+// the browser's tabs or address bar) doesn't flash the panel open and shut
+const HOVER_INTENT_MS = 250;
+const CURSOR_POLL_NEAR_MS = 33;
+const CURSOR_POLL_FAR_MS = 100; // can't reach the island and rest on it in between
+const FAR_PX = 400;
+const SWITCHER_HIDE_DELAY_MS = 240;
 
 let win = null;
 let tray = null;
 let media = null;
+let spotify = null;
+let lastMedia = null;
+let wantsAudioMeter = false;
+let audioMeterOn = false;
+function syncAudioMeter() {
+  const on = !!(wantsAudioMeter && lastMedia?.playing && !screenLocked && win?.isVisible());
+  if (on === audioMeterOn) return;
+  audioMeterOn = on;
+  mediaWrite(on ? 'meter on' : 'meter off');
+}
+ipcMain.on('audio-meter', (event, on) => {
+  if (!win || event.sender !== win.webContents) return;
+  wantsAudioMeter = on === true;
+  syncAudioMeter();
+});
+const browserMedia = createBrowserBridge(path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'NovaIslandBrowser'),
+  () => { if (lastMedia) publishMedia(lastMedia); }, err => log.info(`[browser-media] ${err.code || 'bridge unavailable'}`));
+function publishMedia(data) {
+  lastMedia = data;
+  syncAudioMeter();
+  const source = resolveMediaSource(data, browserMedia.snapshot());
+  const enriched = {...data, source:source?.id === 'media' ? apps.mediaSource(data.app) || source : source};
+  spotify?.observe(screenLocked ? null : enriched);
+  send('media', enriched);
+}
 let quitting = false;
 let userHidden = false;
 let fullscreenHidden = false;
+let switcherHidden = false;
+let switcherHideTimer = null;
+let windowReady = false;
+let kaiPlugin = null;
+let lastWindowState = { fs: false, suspended: false };
 let prefs = Object.assign(
   { ax: null, ay: null, docked: false, vertical: false, side: 'right' },
   settings.load('settings.json', {})
@@ -60,6 +123,8 @@ const V_PILL_HALF_H = 124;
 
 let anchor = null;
 let lastLayout = '';
+let placementTimer = null;
+let activeScale = 1;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
@@ -92,6 +157,25 @@ function clamp(v, lo, hi) {
   return Math.min(Math.max(v, lo), hi);
 }
 
+function uiScaleFor(display) {
+  return Math.min(features.get().islandScale / 100,
+    (display.bounds.width || WIN_W) / WIN_W,
+    (display.workArea.height || display.bounds.height || WIN_H) / WIN_H);
+}
+
+function sendAnchor(message, scale) {
+  const css = { ...message, scale };
+  for (const key of ['x', 'y', 'sw', 'sh', 'rowTop', 'rowBottom', 'panelLeft', 'panelRight']) {
+    if (Number.isFinite(css[key])) css[key] /= scale;
+  }
+  const key = JSON.stringify(css);
+  if (key === lastLayout) return;
+  activeScale = scale;
+  lastLayout = key;
+  win.webContents.setZoomFactor(scale);
+  send('anchor', css);
+}
+
 // Clamp the anchor to the display, position the window around it and tell the renderer
 // where the pill sits inside the window.
 // --- the address bar slot ---
@@ -103,39 +187,67 @@ function clamp(v, lo, hi) {
 let omni = null;
 let omniKey = '';
 const omniAllowed = () => features.get().addrIsland && !prefs.vertical && !prefs.placed;
-function onOmni(o) {
-  const next = o && omniAllowed() ? o : null;
-  const key = next ? `${next.x},${next.y},${next.w},${next.h},${next.focus}` : '';
+function onOmni(o, browser) {
+  const next = o ? { ...o, browser } : null;
+  const key = next ? JSON.stringify(next) : '';
   if (key === omniKey) return;
+  if (hoverOrigin) setActive(false);
   omniKey = key;
   omni = next;
   layout();
+  updateGhost();
 }
 
 function layoutAddressBar() {
   // the helper reports physical pixels; Electron places windows in DIPs
   const r = screen.screenToDipRect(null, { x: omni.x, y: omni.y, width: omni.w, height: omni.h });
-  const b = screen.getDisplayMatching(r).bounds;
+  const display = screen.getDisplayMatching(r);
+  const b = display.bounds;
+  const scale = uiScaleFor(display);
+  const width = Math.round(WIN_W * scale);
+  const height = Math.round(WIN_H * scale);
+  const panelW = PANEL_W * scale;
+  const panelH = PANEL_H * scale;
   const third = r.width / 3;
-  const sh = Math.round(Math.min(30, Math.max(22, r.height + 6)));
-  const sw = Math.round(Math.min(third - 12, 380));
-  const cx = r.x + r.width - third / 2; // centre of the right third
+  const inset = omni.estimated ? 3 : 0;
+  const sh = Math.round(Math.min(30, r.height - inset * 2));
+  const sw = Math.round(Math.min(third - 12, 380 * scale));
+  const cx = r.x + r.width - (omni.estimated ? sw / 2 + 6 : third / 2);
   const top = Math.round(r.y + r.height / 2 - sh / 2);
-  const wx = Math.round(clamp(cx - WIN_W / 2, b.x, b.x + b.width - WIN_W));
-  const wy = Math.round(clamp(top - FLOAT_TOP, b.y, b.y + b.height - WIN_H));
+  const rowTop = r.y;
+  const rowBottom = r.y + r.height;
+  let panelLeft = b.x + 4;
+  let panelRight = b.x + b.width - 4;
+  if (omni.browser) {
+    const { x, y, w, h } = omni.browser;
+    const frame = screen.screenToDipRect(null, { x, y, width: w, height: h });
+    if (frame.width >= panelW + 16 * scale) {
+      panelLeft = Math.max(panelLeft, frame.x + 8 * scale);
+      panelRight = Math.min(panelRight, frame.x + frame.width - 8 * scale);
+    }
+  }
+  const panelCenter = panelRight - panelLeft >= panelW
+    ? clamp(cx, panelLeft + panelW / 2, panelRight - panelW / 2)
+    : cx;
+  // Fit both the collapsed slot and the expanded panel into the transparent host window.
+  const pillLeft = cx - sw / 2 - 4;
+  const pillRight = cx + sw / 2 + 4;
+  const wx = Math.round(clamp(clamp(panelCenter - width / 2, pillRight - width, pillLeft),
+    b.x, b.x + b.width - width));
+  const belowFits = rowBottom + (8 + PANEL_H + 6) * scale <= b.y + b.height;
+  const preferredY = belowFits ? top - FLOAT_TOP * scale : rowTop - panelH - (8 + FLOAT_TOP) * scale;
+  const wy = Math.round(clamp(preferredY, b.y, b.y + b.height - height));
   const cur = win.getBounds();
-  if (cur.x !== wx || cur.y !== wy || cur.width !== WIN_W || cur.height !== WIN_H) {
-    win.setBounds({ x: wx, y: wy, width: WIN_W, height: WIN_H });
+  if (cur.x !== wx || cur.y !== wy || cur.width !== width || cur.height !== height) {
+    win.setBounds({ x: wx, y: wy, width, height });
   }
   const msg = {
     x: Math.round(cx - wx), y: top - wy, docked: false, vertical: false, side: prefs.side,
     addr: omni.focus ? 'line' : 'slim', sw, sh,
+    rowTop: rowTop - wy, rowBottom: rowBottom - wy,
+    panelLeft: Math.round(panelLeft - wx), panelRight: Math.round(panelRight - wx),
   };
-  const key = JSON.stringify(msg);
-  if (key !== lastLayout) {
-    lastLayout = key;
-    send('anchor', msg);
-  }
+  sendAnchor(msg, scale);
 }
 
 function layout() {
@@ -148,22 +260,25 @@ function layout() {
   const display = screen.getDisplayNearestPoint({ x: Math.round(anchor.x), y: Math.round(anchor.y) });
   const b = display.bounds;
   const wa = display.workArea;
+  const scale = uiScaleFor(display);
+  const width = Math.round(WIN_W * scale);
+  const height = Math.round(WIN_H * scale);
   let wx;
   let wy;
   if (prefs.vertical) {
     anchor.x = prefs.side === 'left' ? b.x : b.x + b.width;
-    anchor.y = clamp(anchor.y, wa.y + V_PILL_HALF_H, wa.y + wa.height - V_PILL_HALF_H);
-    wx = prefs.side === 'left' ? b.x : b.x + b.width - WIN_W;
-    wy = Math.round(clamp(anchor.y - WIN_H / 2, wa.y, wa.y + wa.height - WIN_H));
+    anchor.y = clamp(anchor.y, wa.y + V_PILL_HALF_H * scale, wa.y + wa.height - V_PILL_HALF_H * scale);
+    wx = prefs.side === 'left' ? b.x : b.x + b.width - width;
+    wy = Math.round(clamp(anchor.y - height / 2, wa.y, wa.y + wa.height - height));
   } else {
-    anchor.x = clamp(anchor.x, b.x + PILL_HALF_W, b.x + b.width - PILL_HALF_W);
-    anchor.y = prefs.docked ? b.y : clamp(anchor.y, b.y, wa.y + wa.height - PILL_H - 6);
-    wx = Math.round(clamp(anchor.x - WIN_W / 2, b.x, b.x + b.width - WIN_W));
-    wy = Math.round(prefs.docked ? b.y : clamp(anchor.y - FLOAT_TOP, b.y, wa.y + wa.height - WIN_H));
+    anchor.x = clamp(anchor.x, b.x + PILL_HALF_W * scale, b.x + b.width - PILL_HALF_W * scale);
+    anchor.y = prefs.docked ? b.y : clamp(anchor.y, b.y, wa.y + wa.height - (PILL_H + 6) * scale);
+    wx = Math.round(clamp(anchor.x - width / 2, b.x, b.x + b.width - width));
+    wy = Math.round(prefs.docked ? b.y : clamp(anchor.y - FLOAT_TOP * scale, b.y, wa.y + wa.height - height));
   }
   const cur = win.getBounds();
-  if (cur.x !== wx || cur.y !== wy || cur.width !== WIN_W || cur.height !== WIN_H) {
-    win.setBounds({ x: wx, y: wy, width: WIN_W, height: WIN_H });
+  if (cur.x !== wx || cur.y !== wy || cur.width !== width || cur.height !== height) {
+    win.setBounds({ x: wx, y: wy, width, height });
   }
   const msg = {
     x: Math.round(anchor.x - wx),
@@ -172,11 +287,21 @@ function layout() {
     vertical: prefs.vertical,
     side: prefs.side,
   };
-  const key = JSON.stringify(msg);
-  if (key !== lastLayout) {
-    lastLayout = key;
-    send('anchor', msg);
-  }
+  sendAnchor(msg, scale);
+}
+
+function refreshPlacement() {
+  clearTimeout(placementTimer);
+  // Windows can report an intermediate display size while the GPU wakes or a monitor reconnects.
+  placementTimer = setTimeout(() => {
+    placementTimer = null;
+    if (!win || win.isDestroyed() || quitting) return;
+    if (!drag && !prefs.placed && !prefs.vertical) anchor = defaultAnchor();
+    lastLayout = '';
+    layout();
+    updateGhost();
+    if (!lastWindowState.suspended && !lastWindowState.launcher) updateVisibility();
+  }, 300);
 }
 
 function placeWindow() {
@@ -184,6 +309,7 @@ function placeWindow() {
   anchor = Number.isFinite(prefs.ax) && Number.isFinite(prefs.ay) ? { x: prefs.ax, y: prefs.ay } : defaultAnchor();
   // settings from before "placed" existed: judge by where the island is
   if (typeof prefs.placed !== 'boolean') prefs.placed = !atDefaultPlace();
+  if (!prefs.placed && !prefs.vertical) anchor = defaultAnchor();
   layout();
 }
 
@@ -206,6 +332,7 @@ function resetPosition() {
   prefs.placed = false;
   anchor = defaultAnchor();
   layout();
+  updateGhost();
   savePosition();
   notifyGeneral();
 }
@@ -216,19 +343,15 @@ function setVertical(on) {
   const b = screen.getDisplayNearestPoint({ x: Math.round(anchor.x), y: Math.round(anchor.y) }).bounds;
   if (on) {
     prefs.side = anchor.x < b.x + b.width / 2 ? 'left' : 'right';
-    anchor = { x: anchor.x, y: anchor.y + V_PILL_HALF_H };
+    anchor = { x: anchor.x, y: anchor.y + V_PILL_HALF_H * activeScale };
   } else {
     prefs.docked = false;
-    const x = prefs.side === 'left' ? b.x + 260 : b.x + b.width - 260;
-    anchor = { x, y: anchor.y - V_PILL_HALF_H };
+    const x = prefs.side === 'left' ? b.x + 260 * activeScale : b.x + b.width - 260 * activeScale;
+    anchor = { x, y: anchor.y - V_PILL_HALF_H * activeScale };
   }
   prefs.vertical = on;
-  // leaving the address bar at once (it would otherwise stay until the bar itself changes)
-  if (on) {
-    omni = null;
-    omniKey = '';
-  }
   layout();
+  updateGhost();
   savePosition();
   notifyGeneral();
 }
@@ -242,10 +365,10 @@ ipcMain.on('drag-start', () => {
   const p = screen.getCursorScreenPoint();
   dragFrom = { ...anchor };
   // grab the (shrinking) pill near where it was pressed so it stays under the cursor
-  const ox = clamp(p.x - anchor.x, -PILL_HALF_W + 16, PILL_HALF_W - 16);
+  const ox = clamp(p.x - anchor.x, (-PILL_HALF_W + 16) * activeScale, (PILL_HALF_W - 16) * activeScale);
   const oy = prefs.vertical
-    ? clamp(p.y - anchor.y, -V_PILL_HALF_H + 20, V_PILL_HALF_H - 20)
-    : clamp(p.y - anchor.y, 4, PILL_H - 6);
+    ? clamp(p.y - anchor.y, (-V_PILL_HALF_H + 20) * activeScale, (V_PILL_HALF_H - 20) * activeScale)
+    : clamp(p.y - anchor.y, 4 * activeScale, (PILL_H - 6) * activeScale);
   drag = { ox, oy, timer: setInterval(followCursor, 8) };
 });
 
@@ -279,18 +402,32 @@ ipcMain.on('drag-end', () => {
   // a real move decides whether the island stays where the user put it (no address-bar jump)
   if (dragFrom && Math.hypot(anchor.x - dragFrom.x, anchor.y - dragFrom.y) > 20) prefs.placed = !atDefaultPlace();
   dragFrom = null;
+  layout();
+  updateGhost();
   savePosition();
-  captureBackdrop(); // refresh the glass for the new spot right away
+  scheduleCapture(240); // let the drop finish before refreshing the glass
   // don't pop the island open right after a move; re-arm when the cursor leaves
   suppressUntilLeave = true;
   send('hover', false);
 });
 
 function updateVisibility() {
-  if (!win) return;
-  const shouldShow = !userHidden && !(fullscreenHidden && features.get().hideFullscreen);
-  if (shouldShow && !win.isVisible()) win.showInactive();
+  if (!win || !windowReady) return;
+  const shouldShow = !userHidden && !switcherHidden && !(fullscreenHidden && features.get().hideFullscreen);
+  if (shouldShow) {
+    if (!win.isVisible()) {
+      win.showInactive();
+      // the cursor loop may be in its 600 ms hidden sleep: back to hover at once, and let the
+      // window paint before a screen capture competes with it
+      setImmediate(cursorLoop);
+      scheduleCapture(400);
+    }
+    // GX and the Windows switcher can leave a visible island below the active browser.
+    win.setAlwaysOnTop(true, 'screen-saver');
+    win.moveTop();
+  }
   if (!shouldShow && win.isVisible()) win.hide();
+  syncAudioMeter();
   send('visibility', shouldShow);
 }
 
@@ -338,7 +475,55 @@ function createWindow() {
     lastLayout = '';
     layout();
   });
-  win.once('ready-to-show', () => win.showInactive());
+  win.once('ready-to-show', () => {
+    windowReady = true;
+    updateVisibility();
+  });
+}
+
+function onWindowState(data) {
+  const foregroundChanged = data.foreground !== lastWindowState.foreground;
+  const captureEnded = lastWindowState.capture && !data.capture;
+  lastWindowState = data;
+  if (!win || win.isDestroyed()) return;
+  const switching = data.suspended === true;
+  const hideForSwitcher = switching && kaiPlugin?.taskSwitcher === true;
+  if (hideForSwitcher) {
+    if (!switcherHidden && switcherHideTimer === null) {
+      switcherHideTimer = setTimeout(() => {
+        switcherHideTimer = null;
+        if (!win || win.isDestroyed()) return;
+        switcherHidden = true;
+        setActive(false);
+        updateVisibility();
+      }, SWITCHER_HIDE_DELAY_MS);
+    }
+  } else if (switcherHideTimer !== null) {
+    clearTimeout(switcherHideTimer);
+    switcherHideTimer = null;
+  }
+  const fullscreen = data.launcher || switching ? fullscreenHidden : data.fs;
+  const keepSwitcherHidden = hideForSwitcher && switcherHidden;
+  const visibilityChanged = fullscreenHidden !== fullscreen || switcherHidden !== keepSwitcherHidden;
+  fullscreenHidden = fullscreen;
+  switcherHidden = keepSwitcherHidden;
+  if (switching || data.launcher) {
+    // Shell overlays report no browser. Keep the settled anchor until the next app is ready.
+    // Keep the current shape for the snip, and let the snipping overlay receive input.
+    if (data.launcher && !data.capture && active) setActive(false);
+    setMouseCaptured(false);
+  } else {
+    const handle = win.getNativeWindowHandle();
+    const ownWindow = (handle.length === 8 ? handle.readBigUInt64LE() : BigInt(handle.readUInt32LE())).toString();
+    // Keep the browser anchor when our search field temporarily takes keyboard focus.
+    if (data.foreground !== ownWindow) {
+      onOmni(data.omni?.estimated && !kaiPlugin?.operaDocking ? null : data.omni, data.browser);
+      onBrowser(data.browser);
+    }
+  }
+  if (visibilityChanged || (foregroundChanged && !switching && !data.launcher)) updateVisibility();
+  if (foregroundChanged && !switching && !data.launcher) scheduleCapture(400); // glassFreeze: retint for the new app
+  if (captureEnded) scheduleCapture(150);
 }
 
 // --- system bridge: helper/nova-helper.exe (SMTC media, volume, brightness, fullscreen,
@@ -357,6 +542,11 @@ function bridgeStatus() {
 
 function startMedia() {
   media = spawn(HELPER(), [], { windowsHide: true });
+  media.once('spawn', () => {
+    mediaWrite(`privacy ${features.get().privacyDots ? 1 : 0}`);
+    audioMeterOn = false;
+    syncAudioMeter();
+  });
   let buffer = '';
   media.on('error', (err) => {
     console.error('[media] failed to start:', err.message);
@@ -381,14 +571,28 @@ function startMedia() {
         bridge.lastLine = Date.now();
         bridge.state = 'ok';
         if (data.error) console.error('[media]', data.error);
+        if ('strips' in data) {
+          stripsWaiting.get(data.strips)?.(data);
+          stripsWaiting.delete(data.strips);
+          continue;
+        }
+        if ('audioBands' in data) {
+          if (audioMeterOn && Array.isArray(data.audioBands) && data.audioBands.length === 5 && data.audioBands.every(Number.isFinite)) {
+            send('audio-bands', data.audioBands);
+          }
+          continue;
+        }
         // answers to commands (focusapp / runningapps) are not media status
         if ('focusapp' in data || 'running' in data) {
           apps.onHelper(data);
           continue;
         }
+        if (data.windowState) {
+          onWindowState(data);
+          continue;
+        }
         if (typeof data.clip === 'number') onClipboardSeq(data.clip, !!data.clipPriv);
-        if ('omni' in data) onOmni(data.omni);
-        if ('browser' in data) onBrowser(data.browser);
+        if (data.privacy) privacy.onHelper(data.privacy);
         if (typeof data.bat === 'number') onBattery(data.bat, data.ac !== false);
         if (typeof data.rec === 'boolean' && data.rec !== recording) {
           recording = data.rec;
@@ -396,16 +600,13 @@ function startMedia() {
           send('recording', recording);
           updateProtection();
         }
-        if (typeof data.fs === 'boolean' && data.fs !== fullscreenHidden) {
-          fullscreenHidden = data.fs;
-          updateVisibility();
-        }
-        send('media', data);
+        publishMedia(data);
       } catch {}
     }
   });
   media.on('exit', (code) => {
     media = null;
+    if (!quitting) onWindowState({ fs: false, suspended: false });
     if (Date.now() - bridge.lastLine > 10000) {
       bridge.state = 'failed';
       bridge.detail ||= `helper exited (code ${code})`;
@@ -564,61 +765,55 @@ ipcMain.handle('mini-open', async (_e, req) => {
 });
 
 // --- glass backdrop ---
-// CSS backdrop-filter cannot see other windows, so capture the screen area under the
-// island at low resolution and let the renderer blur it.
+// CSS backdrop-filter cannot see other windows, so sample the surrounding screen at
+// low resolution and let the renderer blur the resulting ambient colours.
 // The backdrop is re-captured often while the island is open or changing shape, rarely while
 // it sits collapsed, and not at all while hidden; an unchanged picture is not re-sent.
-const CAPTURE_ACTIVE_MS = 700;
-const CAPTURE_IDLE_MS = 3000;
-const CAPTURE_FROZEN_MS = 60 * 1000; // "Freeze glass while closed"
+const CAPTURE_ACTIVE_MS = 1000;
+const CAPTURE_IDLE_MS = 8000;
 
 let capturing = false;
+let stripsId = 0;
+const stripsWaiting = new Map();
 let captureTimer = null;
 let lastCaptureKey = '';
 let busyUntil = 0; // shape changed recently
 let screenLocked = false;
+let panelOpen = false;
+const canCapture = () => !screenLocked && !lastWindowState.capture && win && !win.isDestroyed() && win.isVisible() && glassLive();
 function scheduleCapture(ms) {
   clearTimeout(captureTimer);
   captureTimer = setTimeout(async () => {
+    captureTimer = null;
     await captureBackdrop();
-    const p = perf();
-    scheduleCapture(active ? CAPTURE_ACTIVE_MS : p.glassFreeze ? CAPTURE_FROZEN_MS : Date.now() < busyUntil ? CAPTURE_ACTIVE_MS : CAPTURE_IDLE_MS);
+    if (captureTimer !== null || !canCapture()) return;
+    if (active || panelOpen) scheduleCapture(CAPTURE_ACTIVE_MS);
+    else if (!perf().glassFreeze) scheduleCapture(Date.now() < busyUntil ? CAPTURE_ACTIVE_MS : CAPTURE_IDLE_MS);
   }, ms);
 }
 async function captureBackdrop() {
-  // skipped while dragging: a capture blocks the main thread and makes the move stutter
-  if (capturing || drag || screenLocked || !win || win.isDestroyed() || !win.isVisible() || !glassLive()) return;
+  // ponytail: the helper samples a few pixels around the window (~8 ms, in its own process);
+  // desktopCapturer grabbed the whole screen and blocked this thread for hundreds of ms
+  if (capturing || drag || !canCapture() || !media) return;
   capturing = true;
   try {
-    const display = screen.getDisplayMatching(win.getBounds());
-    const scale = perfSlow() ? 1 / 4 : 1 / 3;
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: {
-        width: Math.round(display.bounds.width * scale),
-        height: Math.round(display.bounds.height * scale),
-      },
+    const r = screen.dipToScreenRect(win, win.getBounds());
+    const id = ++stripsId;
+    const strips = await new Promise((resolve) => {
+      const timer = setTimeout(() => { stripsWaiting.delete(id); resolve(null); }, 1000);
+      stripsWaiting.set(id, (data) => { clearTimeout(timer); resolve(data); });
+      mediaWrite(`strips ${id} ${Math.round(r.x)} ${Math.round(r.y)} ${Math.round(r.width)} ${Math.round(r.height)}`);
     });
-    const src = sources.find((s) => s.display_id === String(display.id)) || sources[0];
-    if (!src || src.thumbnail.isEmpty()) return;
-    const k = src.thumbnail.getSize().width / display.bounds.width;
-    const b = win.getBounds();
-    const crop = src.thumbnail.crop({
-      x: Math.round((b.x - display.bounds.x) * k),
-      y: Math.round((b.y - display.bounds.y) * k),
-      width: Math.round(b.width * k),
-      height: Math.round(b.height * k),
-    });
+    const frame = strips && stripBackdrop(strips);
+    if (!frame) return;
     // cheap fingerprint: sample the small bitmap instead of hashing all of it
-    const bmp = crop.toBitmap();
+    const bmp = frame.bgra;
     let key = `${bmp.length}`;
     for (let i = 0; i < bmp.length; i += 997) key += bmp[i].toString(36);
     if (key === lastCaptureKey) return;
     lastCaptureKey = key;
     // the raw pixels, not a PNG: no encoding here and no decoding in the island
-    const size = crop.getSize();
-    if (bmp.length === size.width * size.height * 4) send('backdrop', { w: size.width, h: size.height, bgra: bmp });
-    else send('backdrop', crop.toDataURL()); // padded rows (shouldn't happen): the PNG way
+    send('backdrop', frame);
   } catch (err) {
     console.error('[backdrop]', err.message);
   } finally {
@@ -627,22 +822,22 @@ async function captureBackdrop() {
 }
 
 // --- the glass and screen recorders ---
-// The glass is a capture of the screen behind the island, so the island asks Windows to leave it
-// out of captures (or it would show up inside its own glass). NVIDIA reads that request as protected
-// video and turns Instant Replay off. So it's asked only while it's needed: a glass theme, with the
-// glass on, and no screen recorder running. While one runs, a glass theme turns solid in its own
-// colors and comes back when the recorder is gone; solid themes never ask at all.
+// Glass samples the surrounding screen, so screenshots can always include the island.
+// Screen recording still pauses capture work and keeps the theme's solid fallback.
 let recording = false;
-const glassWanted = () => !perf().noBlur && !features.SOLID_THEMES.includes(features.get().theme);
+function activeTheme(theme) {
+  return !kaiPlugin && theme.startsWith('kai-') ? 'original' : theme;
+}
+const glassWanted = () => !perf().noBlur && !features.SOLID_THEMES.includes(activeTheme(features.get().theme));
 const glassLive = () => glassWanted() && !recording;
 let protectedNow = null;
 function updateProtection() {
   if (!win || win.isDestroyed()) return;
-  const on = glassLive();
-  if (on === protectedNow) return;
-  protectedNow = on;
-  win.setContentProtection(on);
-  if (on) {
+  if (protectedNow === null) win.setContentProtection(false);
+  const live = glassLive();
+  if (live === protectedNow) return;
+  protectedNow = live;
+  if (live) {
     lastCaptureKey = '';
     scheduleCapture(150);
   }
@@ -661,7 +856,24 @@ function perf() {
 }
 const perfSlow = () => Object.values(perf()).some(Boolean);
 function islandFeatures() {
-  return { ...features.get(), ...perf(), saver: saverOn };
+  return { ...settingsFeatures(), ...perf(), saver: saverOn };
+}
+
+function settingsFeatures() {
+  const f = features.get();
+  return { ...f, theme: activeTheme(f.theme), kaiPlugin: !!kaiPlugin, kaiNotifications: kaiPlugin?.notifications === true };
+}
+
+function syncKaiPlugin(activePlugins) {
+  const next = activePlugins.find((p) => p.id === plugins.KAI_PLUGIN_ID)?.values ?? null;
+  if (JSON.stringify(next) === JSON.stringify(kaiPlugin)) return;
+  kaiPlugin = next;
+  kaiNotices.setEnabled(next?.notifications === true);
+  if (omni?.estimated && !next?.operaDocking) onOmni(null);
+  onWindowState(lastWindowState);
+  updateProtection();
+  send('features', islandFeatures());
+  prefsWindow.send('features', settingsFeatures());
 }
 let perfKey = '';
 function applyPerf() {
@@ -706,8 +918,8 @@ function onBrowser(b) {
   updateGhost();
 }
 function updateGhost() {
-  let over = false;
-  if (!features.get().addrIsland && browserRect && win && !win.isDestroyed() && islandRect.width) {
+  let over = !!(omni && omniAllowed() && omni.focus);
+  if (!over && !features.get().addrIsland && browserRect && win && !win.isDestroyed() && islandRect.width) {
     const wb = win.getBounds();
     const x = wb.x + islandRect.x;
     const y = wb.y + islandRect.y;
@@ -720,13 +932,8 @@ function updateGhost() {
   ghost = on;
   if (on) setActive(false);
 }
-// a toast with a button, a reminder or a scene: clickable over the browser too, while it's there
+// Action cards can take input even in the browser's pass-through mode.
 let clickable = false;
-ipcMain.on('clickable', (_e, on) => {
-  clickable = !!on;
-  // it's gone: over the browser the island lets the mouse through again (and doesn't open)
-  if (!clickable && ghost) setActive(false);
-});
 ipcMain.on('pinned', (_e, on) => {
   if (!on && ghostOpen) {
     ghostOpen = false;
@@ -734,87 +941,135 @@ ipcMain.on('pinned', (_e, on) => {
   }
 });
 
-// --- hover detection with intent ---
-// Forwarded mouse events are unreliable on transparent windows, so poll the cursor.
-// The island only becomes interactive after the cursor rests on it, so a quick sweep
-// to a browser tab underneath never gets caught.
+// Forwarded mouse events are unreliable on transparent windows. Poll the cursor and
+// use the same committed geometry for hover and native mouse capture.
 let islandRect = { x: 0, y: 0, width: 0, height: 0 };
-let inside = false;
 let active = false;
-let enteredAt = 0;
+let mouseCaptured = false;
+let hoverOrigin = null;
 let suppressUntilLeave = false;
 
 ipcMain.on('island-rect', (_e, r) => {
+  if (Math.abs((r.scale || 1) - activeScale) > .001) return;
+  clickable = r.clickable === true;
+  const opened = r.mode === 'expanded';
+  const panelChanged = opened !== panelOpen;
+  panelOpen = opened;
+  r = { x: r.x * activeScale, y: r.y * activeScale, width: r.width * activeScale, height: r.height * activeScale };
   const resized = r.width !== islandRect.width || r.height !== islandRect.height;
   islandRect = r;
   updateGhost();
-  if (resized) {
+  if (!clickable && ghost) setActive(false);
+  if (resized || panelChanged) {
     busyUntil = Date.now() + 2000;
-    scheduleCapture(120);
+    scheduleCapture(240);
   }
+  pollCursor();
 });
 
 function setActive(on) {
   if (on === active) return;
   active = on;
-  win.setIgnoreMouseEvents(!on);
-  if (on) scheduleCapture(60);
+  hoverOrigin = on && !panelOpen && !clickable && !ghost ? { ...islandRect } : null;
+  if (!on) setMouseCaptured(false);
   if (!on && win.isFocusable()) win.setFocusable(false);
   send('hover', on);
+}
+
+function setMouseCaptured(on) {
+  if (on === mouseCaptured) return;
+  mouseCaptured = on;
+  win.setIgnoreMouseEvents(!on);
+  // once clicks pass through, the page never hears the cursor leave and a :hover sticks;
+  // a move to nowhere clears it
+  if (!on) win.webContents.sendInputEvent({ type: 'mouseMove', x: -1, y: -1 });
 }
 
 // Nova's eyes follow the cursor while it is near the island (sent only on real movement).
 const NEAR_PX = 260;
 let nearSent = null;
+let nearAt = 0;
+let nearTimer = null;
+// <=10 sends/s; a throttled value is sent trailing so the eyes settle on the last position
+function pushNear(v) {
+  clearTimeout(nearTimer);
+  nearTimer = null;
+  const wait = nearAt + 100 - Date.now();
+  if (wait > 0) { nearTimer = setTimeout(() => pushNear(v), wait); return; }
+  nearAt = Date.now();
+  send('near', v);
+}
 function sendNear(x, y) {
-  if (!features.get().novaEyes || perfSlow() || !islandRect.width) {
+  const f = features.get();
+  const artwork = companionStates.usesArtwork(f.companionStyle || 'phoenix');
+  const follows = artwork ? f.phoenixIdle || (f.companionStyle !== 'zaher-standing' && (f.phoenixBlink || f.phoenixLookLeft || f.phoenixLookRight))
+    : f.companionStyle === 'classic' && f.novaEyes && !perfSlow();
+  if (!follows || !islandRect.width) {
     if (nearSent) {
       nearSent = null;
-      send('near', null);
+      pushNear(null);
     }
     return;
   }
-  const dx = Math.round(x - (islandRect.x + islandRect.width / 2));
-  const dy = Math.round(y - (islandRect.y + islandRect.height / 2));
+  const dx = Math.round((x - (islandRect.x + islandRect.width / 2)) / activeScale / 8) * 8; // 8 px steps
+  const dy = Math.round((y - (islandRect.y + islandRect.height / 2)) / activeScale / 8) * 8;
   const near = Math.hypot(dx, dy) < NEAR_PX;
   if (!near) {
-    if (nearSent) send('near', null);
+    if (nearSent) pushNear(null);
     nearSent = null;
     return;
   }
-  if (nearSent && Math.abs(nearSent.dx - dx) < 3 && Math.abs(nearSent.dy - dy) < 3) return;
+  if (nearSent && nearSent.dx === dx && nearSent.dy === dy) return;
   nearSent = { dx, dy };
-  send('near', nearSent);
+  pushNear(nearSent);
 }
 
-// how far the cursor is from the island: far away it is checked 10 times a second, not 25 (it
-// can't reach the island and rest on it for the hover intent in between)
+let inside = false;
+let enteredAt = 0;
 let cursorFar = false;
-const FAR_PX = 400;
+// fast only near the island; hidden and locked windows sleep
+let cursorTimer = null;
+function cursorLoop() {
+  clearTimeout(cursorTimer);
+  pollCursor();
+  const hidden = !win || win.isDestroyed() || !win.isVisible() || screenLocked;
+  cursorTimer = setTimeout(cursorLoop, hidden ? 600 : cursorFar ? CURSOR_POLL_FAR_MS : CURSOR_POLL_NEAR_MS);
+}
 function pollCursor() {
-  if (!win || win.isDestroyed() || !win.isVisible() || drag) return;
+  if (!win || win.isDestroyed() || !win.isVisible() || screenLocked || !islandRect.width || drag || lastWindowState.launcher || lastWindowState.suspended) return;
   const p = screen.getCursorScreenPoint();
   const b = win.getBounds();
   const x = p.x - b.x;
   const y = p.y - b.y;
   const fx = Math.max(islandRect.x - x, 0, x - islandRect.x - islandRect.width);
   const fy = Math.max(islandRect.y - y, 0, y - islandRect.y - islandRect.height);
-  cursorFar = Math.hypot(fx, fy) > FAR_PX;
+  cursorFar = Math.hypot(fx, fy) > FAR_PX * activeScale;
   sendNear(x, y);
-  const pad = active ? 8 : 2;
-  const now =
+  const pad = (active ? 8 : 2) * activeScale;
+  const hit =
     x >= islandRect.x - pad &&
     x <= islandRect.x + islandRect.width + pad &&
     y >= islandRect.y - pad &&
     y <= islandRect.y + islandRect.height + pad;
+  // Keep a path from the old pill to the panel when it jumps below the browser bar
+  // or inward from a side dock. That path never captures clicks.
+  const crossing = panelOpen && hoverOrigin &&
+    x >= hoverOrigin.x - pad && x <= hoverOrigin.x + hoverOrigin.width + pad &&
+    y >= Math.min(hoverOrigin.y, islandRect.y + islandRect.height) - pad &&
+    y <= Math.max(hoverOrigin.y + hoverOrigin.height, islandRect.y) + pad;
+  const now = hit || !!crossing;
   if (now && !inside) enteredAt = Date.now();
   inside = now;
   if (!now) {
     suppressUntilLeave = false;
     setActive(false);
-  } else if (!active && !suppressUntilLeave && (!ghost || clickable) && Date.now() - enteredAt >= HOVER_INTENT_MS) {
+  } else if (!active && (!suppressUntilLeave || clickable) && (!ghost || clickable) &&
+    (clickable || Date.now() - enteredAt >= HOVER_INTENT_MS)) {
     setActive(true);
   }
+  const onPaint = x >= islandRect.x && x <= islandRect.x + islandRect.width &&
+    y >= islandRect.y && y <= islandRect.y + islandRect.height;
+  setMouseCaptured(active && onPaint);
 }
 
 // Text inputs (app search) need keyboard focus; the window is otherwise non-focusable.
@@ -973,7 +1228,16 @@ function generalState() {
 function notifyGeneral() {
   prefsWindow.send('general', generalState());
 }
-ipcMain.on('open-settings', () => prefsWindow.open());
+ipcMain.on('open-settings', (_e, page) => prefsWindow.open(page === 'island' ? 'island' : undefined));
+const mediaSettingsSender = e => (win && e.sender === win.webContents) || prefsWindow.owns(e.sender);
+ipcMain.handle('spotify-status', e => mediaSettingsSender(e) ? spotify?.snapshot() || {connected:false} : null);
+ipcMain.handle('spotify-connect', (e, clientId) => mediaSettingsSender(e) ? spotify?.connect(clientId) : {ok:false});
+ipcMain.handle('spotify-disconnect', e => { if (mediaSettingsSender(e)) spotify?.disconnect(); });
+ipcMain.handle('spotify-like', (e, id, liked) => win && e.sender === win.webContents ? spotify?.setLiked(id, liked) : {ok:false});
+ipcMain.handle('browser-companion-status', e => mediaSettingsSender(e) ? {folder:path.join(app.getPath('userData'),'browser-companion'),
+  connected:browserMedia.snapshot().some(r => Date.now()-r.received < 35000)} : null);
+ipcMain.on('browser-companion-folder', e => { if (mediaSettingsSender(e)) shell.openPath(path.join(app.getPath('userData'),'browser-companion')); });
+ipcMain.on('spotify-dashboard', e => { if (mediaSettingsSender(e)) shell.openExternal('https://developer.spotify.com/dashboard'); });
 // news: the island reports what it showed or closed, and opens a link main read itself
 ipcMain.on('news-shown', (_e, id) => news.shown(String(id)));
 ipcMain.on('news-dismiss', (_e, id) => news.dismiss(String(id)));
@@ -990,11 +1254,23 @@ function openNovaLink(link) {
 // the island page reports once all its scripts ran (an early error would stop it before this)
 ipcMain.on('island-ready', () => log.info('island ready'));
 ipcMain.on('update-install', () => updater.install());
-ipcMain.handle('features-get', () => features.get());
+ipcMain.handle('features-get', () => settingsFeatures());
+ipcMain.on('kai-notice-preview', (_e, kind) => {
+  if (!kaiPlugin?.notifications) return;
+  const samples = {
+    task_reminder: { title: 'Review study notes · in 10 min', body: 'A reminder from your garden' },
+    focus_done: { title: '25 minutes tended ✿', body: 'A round well kept' },
+    test: { title: 'Kai’s Flow', body: 'Your custom island notification is ready.' },
+  };
+  if (Object.hasOwn(samples, kind)) send('kai-notice', { ...samples[kind], kind, preview: true });
+});
 ipcMain.handle('island-features', () => islandFeatures());
 ipcMain.on('features-set', (_e, patch) => features.set(patch));
 ipcMain.on('features-reset', () => features.reset());
 ipcMain.on('reminder-preview', () => send('reminder-now'));
+ipcMain.on('phoenix-preview', (e, id) => {
+  if (prefsWindow.owns(e.sender) && companionStates.some(pose => pose.id === id)) send('phoenix-preview',id);
+});
 ipcMain.handle('general-get', () => generalState());
 // Settings > Support: the page names a link, main holds the addresses
 const SUPPORT_LINKS = {
@@ -1109,24 +1385,20 @@ let newsOn = features.get().news;
 features.onChange((f) => {
   evalSaver();
   applyPerf();
+  layout();
   updateGhost();
-  if (!f.addrIsland && omni) {
-    omni = null;
-    omniKey = '';
-    layout();
-  }
   const calc = `${f.asrHanafi}|${f.hijriAdjust}`;
   if (calc !== prayerCalc) {
     prayerCalc = calc;
     prayer.refresh();
   }
   send('features', islandFeatures());
-  prefsWindow.send('features', f);
+  prefsWindow.send('features', settingsFeatures());
   downloads.setEnabled(f.downloads);
   downloads.setFolders(f.folderDownloads);
-  privacy.setEnabled(f.privacyDots);
+  if (privacy.setEnabled(f.privacyDots)) mediaWrite(`privacy ${f.privacyDots ? 1 : 0}`);
   network.setEnabled(f.netToasts);
-  // a glass or a solid theme: ask Windows to hide the island from captures only for glass
+  // Glass and solid themes both remain visible in screenshots.
   updateProtection();
   if (f.news !== newsOn) {
     newsOn = f.news;
@@ -1197,9 +1469,18 @@ function migrateStartup() {
 }
 
 app.whenReady().then(() => {
+  spotify = createSpotify({store:settings, encrypt:value => {
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows could not securely store your Spotify connection.');
+    return safeStorage.encryptString(value);
+  }, decrypt:bytes => safeStorage.decryptString(bytes), openExternal:url => shell.openExternal(url),
+  onChange:value => { send('spotify',value); prefsWindow.send('spotify',value); }});
+  browserMedia.start();
+  if (app.isPackaged) browserCompanion.prepare(app.getPath('userData'),scriptPath(path.join('helper','browser-media-host.exe')))
+    .catch(err => log.info(`[browser-companion] ${err.code || 'setup unavailable'}`));
   migrateStartup();
   if (process.argv.includes('--setup')) runSetup();
   createWindow();
+  if (app.isPackaged) setTimeout(() => otherNova.check(win).catch((err) => log.info(`[other-nova] ${err.message}`)), 4000);
   buildTray();
   startMedia();
   system.start(send);
@@ -1211,6 +1492,7 @@ app.whenReady().then(() => {
   updater.start(send, autoUpdate);
   news.start(send, features.get().news);
   plugins.start((ch, data) => {
+    if (ch === 'plugins') syncKaiPlugin(data);
     send(ch, data);
     prefsWindow.send(ch, data);
   });
@@ -1226,11 +1508,16 @@ app.whenReady().then(() => {
       news.retrySoon();
     }, 5000);
   };
-  powerMonitor.on('resume', wake);
+  powerMonitor.on('resume', () => {
+    refreshPlacement();
+    wake();
+  });
   // locked: nobody sees the island, so no screen capture (and a slow cursor check) until unlocked
-  powerMonitor.on('lock-screen', () => { screenLocked = true; });
+  powerMonitor.on('lock-screen', () => { screenLocked = true; syncAudioMeter(); });
   powerMonitor.on('unlock-screen', () => {
     screenLocked = false;
+    syncAudioMeter();
+    refreshPlacement();
     lastCaptureKey = '';
     scheduleCapture(300);
   });
@@ -1242,13 +1529,7 @@ app.whenReady().then(() => {
   apps.setHelper(mediaWrite);
   apps.init(async () => send('apps', await apps.list()));
   shelf.start(async () => send('shelf', await shelf.list()));
-  // the poll is cheap but still a wake-up: with the performance options on it runs fast only
-  // while the cursor is on the island (hover intent needs ~280 ms), and slowly while it's hidden
-  (function cursorLoop() {
-    pollCursor();
-    const hidden = !win || win.isDestroyed() || !win.isVisible() || screenLocked;
-    setTimeout(cursorLoop, hidden ? 600 : cursorFar ? 100 : perfSlow() && !inside ? 120 : 40);
-  })();
+  cursorLoop();
   scheduleCapture(300);
   globalShortcut.register('CommandOrControl+Alt+I', () => {
     if (ghost) {
@@ -1257,13 +1538,18 @@ app.whenReady().then(() => {
     }
     send('toggle');
   });
-  screen.on('display-metrics-changed', () => layout());
-  screen.on('display-added', () => layout());
-  screen.on('display-removed', () => layout());
+  screen.on('display-metrics-changed', refreshPlacement);
+  screen.on('display-added', refreshPlacement);
+  screen.on('display-removed', refreshPlacement);
 });
 
 app.on('before-quit', () => {
   quitting = true;
+  clearTimeout(switcherHideTimer);
+  clearTimeout(placementTimer);
+  kaiNotices.setEnabled(false);
+  browserMedia.stop();
+  spotify?.stop();
   globalShortcut.unregisterAll();
   if (media) media.kill();
 });
