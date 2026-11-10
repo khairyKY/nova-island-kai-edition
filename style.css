@@ -716,11 +716,11 @@ body[data-theme] .picker input::placeholder { color: var(--text-3); opacity: 1; 
 .wx.night .wx-top svg, .wx.cloudy .wx-top svg { color: var(--text-1); }
 .wx-top b { font-size: 30px; font-weight: 600; letter-spacing: -.03em; }
 .wx-desc { font-size: 13px; font-weight: 600; }
-.meters { padding: 12px 14px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+.meters { padding: 10px 14px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
 .meter-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
-.meter-row span { display: flex; align-items: center; gap: 6px; }
+.meter-row span { display: flex; align-items: center; gap: 6px; flex: none; }
 .meter-row svg { width: 14px; height: 14px; }
-.meter-row b { font-size: 12px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.meter-row b { min-width: 0; margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .14); overflow: hidden; }
 .bar b { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--green); transition: width .8s var(--ease-out), background .4s; }
 .bar b.warn { background: var(--orange); }

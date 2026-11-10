@@ -12,7 +12,8 @@
   function row(n) {
     const off = n.link === 'none' || n.internet === false;
     $('#net-row').classList.toggle('off', off);
-    $('#net-val').textContent = n.link !== 'none' && n.internet === false ? `${label(n)} · no internet` : label(n);
+    const net = n.link !== 'none' && n.internet === false ? `${label(n)} · no internet` : label(n);
+    $('#net-val').textContent = $('#net-val').title = net;
   }
 
   function update(n) {
