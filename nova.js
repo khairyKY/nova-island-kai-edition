@@ -1573,6 +1573,9 @@ app.whenReady().then(() => {
   cursorLoop();
   scheduleCapture(300);
   globalShortcut.register('CommandOrControl+Alt+I', () => {
+    // never while Windows' app switcher (Alt+Tab, the three-finger swipe) is up: opening the island
+    // would take focus and close the switcher mid-choice
+    if (lastWindowState.suspended) return;
     if (ghost) {
       ghostOpen = true;
       updateGhost();
