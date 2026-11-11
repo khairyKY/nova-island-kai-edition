@@ -1221,6 +1221,7 @@ function showToast(kind, label, value, pct, ms = 3200, action = null) {
   const t = $('.l-toast');
   t.className = `layer l-toast ${kind}`;
   $('#t-label').textContent = label;
+  $('#t-label').dir = 'auto'; // (an app notice sets it from its message)
   $('#t-value').textContent = value;
   $('.l-toast .batt b').style.width = `${Math.round((pct ?? 0) * 100)}%`;
   $('.t-bar b').style.width = `${Math.round((pct ?? 0) * 100)}%`;

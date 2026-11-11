@@ -27,6 +27,53 @@
   const seenRecently = (title) => { const t = norm(title); return !!t && recent.some(([r, at]) => Date.now() - at < 10000 && (r === t || r.startsWith(t) || t.startsWith(r))); };
   bridge.onKaiNotice((n) => seen(n.title));
 
+  // right to left when most of its letters are from a right-to-left script
+  const RTL = /[֐-ࣿיִ-﷿ﹰ-ﻼ]/g;
+  const LTR = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]/g;
+  function direction(s) {
+    const r = (String(s).match(RTL) || []).length, l = (String(s).match(LTR) || []).length;
+    return r > l ? 'rtl' : r || l ? 'ltr' : 'auto';
+  }
+
+  // Windows hands over many app logos with lots of empty transparent space around them, so the logo
+  // came out tiny in its 22 px: the empty border is trimmed off (once per icon)
+  const trimmed = new Map();
+  function trimIcon(src) {
+    if (trimmed.has(src)) return Promise.resolve(trimmed.get(src));
+    return new Promise((done) => {
+      const keep = (out) => { if (trimmed.size > 60) trimmed.delete(trimmed.keys().next().value); trimmed.set(src, out); done(out); };
+      const img = new Image();
+      img.onerror = () => keep(src);
+      img.onload = () => {
+        const w = img.naturalWidth || 64, h = img.naturalHeight || 64;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const x = c.getContext('2d', { willReadFrequently: true });
+        x.drawImage(img, 0, 0, w, h);
+        let px;
+        try { px = x.getImageData(0, 0, w, h).data; } catch { return keep(src); }
+        let top = h, left = w, bottom = -1, right = -1;
+        for (let y = 0; y < h; y++) {
+          for (let i = 0; i < w; i++) {
+            if (px[(y * w + i) * 4 + 3] > 24) {
+              if (y < top) top = y; if (y > bottom) bottom = y;
+              if (i < left) left = i; if (i > right) right = i;
+            }
+          }
+        }
+        if (right < 0) return keep(src);
+        const bw = right - left + 1, bh = bottom - top + 1, side = Math.max(bw, bh);
+        if (side >= Math.max(w, h) * 0.86) return keep(src); // it already fills its square
+        const pad = Math.round(side * 0.04), size = side + pad * 2;
+        const o = document.createElement('canvas');
+        o.width = o.height = size;
+        o.getContext('2d').drawImage(c, left, top, bw, bh, pad + (side - bw) / 2, pad + (side - bh) / 2, bw, bh);
+        keep(o.toDataURL('image/png'));
+      };
+      img.src = src;
+    });
+  }
+
   function show(n) {
     const known = KNOWN[n.app] || {};
     const icon = n.icon || known.icon || '';
@@ -37,14 +84,27 @@
     showToast('appnote', text, aumid ? 'Open' : '', 0, 6000, aumid ? () => bridge.appNotifyOpen(aumid) : null);
     const t = document.querySelector('.l-toast');
     t.classList.toggle('noicon', !icon);
-    if (icon) document.querySelector('.t-shot').src = icon;
+    const shot = document.querySelector('.t-shot');
+    if (icon) {
+      shot.src = icon;
+      shot.dataset.icon = icon;
+      trimIcon(icon).then((src) => { if (shot.dataset.icon === icon) shot.src = src; }); // (still this notice's)
+    }
     t.style.setProperty('--app-rgb', rgb ? rgb.join(', ') : 'var(--accent-rgb)');
+    // a message in Arabic (or Hebrew, Persian...) reads right to left, even when the sender's name
+    // before it is in Latin letters: the direction comes from the message itself
+    const label = document.getElementById('t-label');
+    label.dir = direction(n.body || head);
     // a text that doesn't fit scrolls once to its end, and the notice waits for it
     requestAnimationFrame(() => {
-      const label = document.getElementById('t-label');
       if (!label || label.textContent !== text) return;
+      // the name and the message each keep their own direction (<bdi>), so mixed scripts and the
+      // punctuation between them don't get shuffled
       const span = document.createElement('span');
-      span.textContent = text;
+      const part = (s) => { const b = document.createElement('bdi'); b.textContent = s; return b; };
+      if (n.body) span.append(part(head), ': ', part(n.body));
+      else span.append(part(head));
+      if (n.more) span.append(` (+${n.more})`);
       label.textContent = '';
       label.append(span);
       const over = span.offsetWidth - label.clientWidth;
