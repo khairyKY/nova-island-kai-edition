@@ -28,8 +28,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Build and publish
-        shell: bash # PowerShell splits "-c.publish..." into a config file path
-        run: npx electron-builder --win nsis --publish always -c.publish.releaseType=release
+      - name: Build
+        run: npx electron-builder --win nsis --publish never
+      # gh, not electron-builder's publisher: that one won't add files to a release older than 2 h
+      - name: Publish
+        shell: bash
+        run: |
+          V=$(node -p "require('./package.json').version")
+          gh release view "v$V" >/dev/null 2>&1 || gh release create "v$V" --title "$V" --notes "Nova Island Kai Edition $V"
+          gh release upload "v$V" --clobber "dist/Nova-Island-Kai-Edition-Setup-$V.exe" "dist/Nova-Island-Kai-Edition-Setup-$V.exe.blockmap" dist/latest.yml
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
