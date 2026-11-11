@@ -1456,7 +1456,15 @@ function applyFeatures(f) {
 bridge.onFeatures(applyFeatures);
 // a screen recorder is running (NVIDIA Instant Replay, OBS): a glass theme turns solid until it's gone
 bridge.onRecording((on) => document.body.classList.toggle('th-rec', !!on));
-bridge.onSaver((s) => showToast('saver',
+// the battery saver switched off, the PC on Ultimate Performance: its own notice (style-2.css)
+function performanceMode(s) {
+  showToast('perf', 'Performance mode', s.hz ? `Ultimate · ${s.hz} Hz` : 'Ultimate', 0, 3800);
+  island.classList.remove('perf-burst');
+  void island.offsetWidth; // so the pulse plays again on a second switch
+  island.classList.add('perf-burst');
+  setTimeout(() => island.classList.remove('perf-burst'), 1300);
+}
+bridge.onSaver((s) => s.perf ? performanceMode(s) : showToast('saver',
   s.stays ? 'Battery saver stays on' : s.on ? 'Battery saver is on' : 'Battery saver is off',
   s.stays ? `${s.pct}% · below ${s.at}%` : s.pct >= 0 ? `${s.pct}%` : '', 0, 3500));
 bridge.onVisibility((v) => {

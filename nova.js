@@ -958,12 +958,16 @@ features.onChange((f) => {
   if (f.saverNow === saverNow) return;
   saverNow = f.saverNow;
   saverSwitching = true;
+  // switched off by hand: the notice is Performance mode (with the refresh rate that comes back)
+  const hz = saverNow ? 0 : settings.load('saver-state.json', null)?.fx?.hz || 0;
+  perfNext = saverNow ? null : { hz };
   // the island moves to (or back from) Graphics > Low: a restart, once the PC's settings are done,
   // and the notice is shown after it
   const restart = effGraphics(f) !== graphics;
+  restartPending = restart; // the notice is shown by the restarted island, not this one
   pcSaver(saverNow).catch((err) => log.info(`pc battery saver: ${err.message}`)).finally(() => {
     if (!restart) { saverSwitching = false; return; }
-    app.relaunch({ args: [...process.argv.slice(1).filter((a) => !a.startsWith('--saver-notice=')), `--saver-notice=${saverNow ? 'on' : 'off'}`] });
+    app.relaunch({ args: [...process.argv.slice(1).filter((a) => !a.startsWith('--saver-notice=')), `--saver-notice=${saverNow ? 'on' : `perf:${hz}`}`] });
     app.exit(0);
   });
   if (restart) return;
@@ -986,7 +990,12 @@ function perf() {
   const s = saverOn && Date.now() >= saverQuietUntil;
   return { noBlur: f.noBlur || s, noAnimations: f.noAnimations || s, glassFreeze: f.glassFreeze || s };
 }
+let perfNext = null;
+let restartPending = false;
 function saverNotice(payload) {
+  if (restartPending) return;
+  if (!payload.on && perfNext) Object.assign(payload, { perf: true, hz: perfNext.hz });
+  perfNext = null;
   saverQuietUntil = Date.now() + 3800;
   applyPerf();
   send('saver', payload);
@@ -1421,7 +1430,7 @@ ipcMain.on('island-ready', () => {
   // restarted by the battery saver switch (for Graphics > Low): the notice it would have shown
   const notice = process.argv.find((a) => a.startsWith('--saver-notice='));
   // (switched on, the island's own start shows 'Battery saver is on' already)
-  if (notice?.endsWith('off')) setTimeout(() => saverNotice({ on: saverOn, pct: battery.pct, stays: saverOn, at: features.get().batterySaverAt }), 1200);
+  if (notice?.includes('=perf')) setTimeout(() => { perfNext = { hz: +notice.split(':')[1] || 0 }; saverNotice({ on: saverOn, pct: battery.pct, stays: saverOn, at: features.get().batterySaverAt }); }, 1200);
 });
 ipcMain.on('update-install', () => updater.install());
 // Settings > General: check now, and "Update now" (the island counts down, as its own card does)
