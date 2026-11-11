@@ -924,6 +924,21 @@ function updateMediaSource(m) {
   });
   $('#v-media').classList.toggle('spotify-source', source?.id === 'spotify');
 }
+// Settings > Alerts > Focus apps: while one of them is in front (VLC with a lecture, a game in a
+// window), app and Kai's Flow notices wait, and come once you've switched away. (Fullscreen apps
+// hide the island, which holds them too.) The app in front comes with every media update.
+const focusApps = () => String(state.features.focusApps || '').toLowerCase().split(/[\s,]+/).filter(Boolean).map((a) => a.replace(/\.exe$/, ''));
+window.noticesHeld = () => {
+  const fg = String(state.media.fgProc || '').toLowerCase().replace(/\.exe$/, '');
+  return !!fg && focusApps().includes(fg);
+};
+let wasHeld = false;
+function syncHeld() {
+  const held = window.noticesHeld();
+  if (held === wasHeld) return;
+  wasHeld = held;
+  window.dispatchEvent(new CustomEvent('island:held', { detail: held }));
+}
 function onMediaUpdate(m) {
   if (m.error) return;
   const previous = state.media;
@@ -940,6 +955,7 @@ function onMediaUpdate(m) {
   if (!m.playing && previous.playing) setTimeout(render, SONG_GAP_MS + 30); // a real pause: collapse after the gap
   state.mediaAt = performance.now();
   state.mediaFront = isMediaInFront(m);
+  syncHeld();
   updateMediaSource(m);
   const battery = $('#i-battery-group');
   const batteryText = typeof m.bat === 'number' && m.bat >= 0 && m.bat <= 100 ? `${Math.round(m.bat)}%` : '';

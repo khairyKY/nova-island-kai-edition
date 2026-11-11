@@ -125,7 +125,8 @@
   function next() {
     if (!queue.length) return;
     const mode = currentMode();
-    if (!state.visible || ['expanded', 'scene', 'reminder'].includes(mode) || Date.now() < state.toastUntil) return;
+    // (held while a focus app is in front: Settings > Alerts > Focus apps)
+    if (!state.visible || window.noticesHeld?.() || ['expanded', 'scene', 'reminder'].includes(mode) || Date.now() < state.toastUntil) return;
     show(queue.shift());
   }
   // Settings > Animations preview: straight to the island (no dedupe, no per-app pause)
@@ -153,6 +154,7 @@
   });
   const requestNext = () => queueMicrotask(next);
   window.addEventListener('island:mode', requestNext);
+  window.addEventListener('island:held', requestNext); // the focus app went away: what waited comes now
   window.addEventListener('island:toast-end', requestNext);
   bridge.onVisibility(requestNext);
 })();

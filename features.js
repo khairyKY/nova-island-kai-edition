@@ -52,6 +52,7 @@ const DEFAULTS = {
   noAnimations: false,
   glassFreeze: true, // refresh the glass on opening and moving, not while it sits closed
   graphics: 'veryHigh', // how it's drawn, memory against smoothness (nova.js, applied on a restart)
+  focusApps: 'vlc', // notices wait while one of these apps is in front (process names), and come after
   saverShortcut: false, // Ctrl+Alt+B (Pady's 4-finger hold) switches Battery saver now: opt-in, it changes the PC's settings
   saverNow: false, // switched by hand (Settings, the tray, Ctrl+Alt+B, Pady): the island's saver + Windows' Battery saver
   batterySaver: false,
@@ -109,6 +110,9 @@ const RANGES = {
   kaiNoticeSeconds: [3, 30],
 };
 
+// settings that are a short text (letters, digits, spaces and . , + - only)
+const TEXTS = { focusApps: 200 };
+
 // settings that are one of a fixed list
 const CHOICES = {
   companionStyle: ['phoenix', 'gazelle', 'zaher-seated', 'zaher-standing', 'classic', 'none'],
@@ -138,6 +142,8 @@ function pick(obj) {
       if (CHOICES[k].includes(v)) out[k] = v;
     } else if (RANGES[k]) {
       if (Number.isFinite(v)) out[k] = Math.min(Math.max(Math.round(v), RANGES[k][0]), RANGES[k][1]);
+    } else if (TEXTS[k]) {
+      if (typeof v === 'string') out[k] = v.replace(/[^\w .,+-]/g, '').slice(0, TEXTS[k]);
     } else if (typeof v === 'boolean') out[k] = v;
   }
   return out;

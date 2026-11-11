@@ -110,6 +110,7 @@ function showFeatures(f) {
   $$('[data-kai-style]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.kaiStyle === f.kaiNoticeStyle)));
   const dust = f.softDust === false ? 'off' : f.dustStyle || 'soft';
   $$('[data-dust]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.dust === dust)));
+  if (document.activeElement !== $('#focus-apps')) $('#focus-apps').value = f.focusApps ?? 'vlc';
   const sc = f.songChange || 'pill';
   $$('[data-song-change]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.songChange === sc)));
   $('#song-change-note').textContent = sc === 'card'
@@ -612,4 +613,11 @@ api.whatsNew().then(({ current, from, entries }) => {
     }
     list.append(head, card);
   }
+});
+
+// Focus apps: saved as you type (a moment after the last key)
+let focusTimer = 0;
+$('#focus-apps').addEventListener('input', (e) => {
+  clearTimeout(focusTimer);
+  focusTimer = setTimeout(() => { api.setFeatures({ focusApps: e.target.value }); saved(); }, 600);
 });
