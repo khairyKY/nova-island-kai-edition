@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('nova', {
   onKaiNotice: on('kai-notice'),
   onAppNotice: on('app-notice'),
   appNotifyOpen: (aumid) => ipcRenderer.send('app-notify-open', aumid),
+  snapIsland: (rect) => ipcRenderer.invoke('snap-island', rect),
   onClipSmart: on('clip-smart'),
   onNear: on('near'),
   clipAction: (action) => ipcRenderer.send('clip-action', action),

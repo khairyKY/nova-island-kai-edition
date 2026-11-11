@@ -1109,6 +1109,18 @@ ipcMain.on('focus-input', (_e, on) => {
 });
 
 // --- apps ---
+// A picture of the island as it is now (the soft dust transition is made from these): the rect is
+// in the page's CSS pixels; the bitmap comes back BGRA at the screen's resolution.
+ipcMain.handle('snap-island', async (_e, r) => {
+  if (!win || win.isDestroyed() || !r || ![r.x, r.y, r.width, r.height].every(Number.isFinite)) return null;
+  const k = win.webContents.getZoomFactor();
+  const rect = { x: Math.max(0, Math.round(r.x * k)), y: Math.max(0, Math.round(r.y * k)), width: Math.round(r.width * k), height: Math.round(r.height * k) };
+  if (rect.width < 4 || rect.height < 4 || rect.width > 2000 || rect.height > 1200) return null;
+  const img = await win.webContents.capturePage(rect);
+  if (img.isEmpty()) return null;
+  const size = img.getSize();
+  return { w: size.width, h: size.height, bgra: img.toBitmap() };
+});
 ipcMain.handle('apps-list', () => apps.list());
 ipcMain.handle('apps-all', () => apps.all());
 ipcMain.on('apps-add', (_e, id) => apps.add(id));
