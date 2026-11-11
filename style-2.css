@@ -75,9 +75,16 @@
 #island { z-index: 2; }
 .pd-goo { position: absolute; inset: 0; filter: url(#goo) drop-shadow(0 8px 14px rgba(0, 0, 0, .22)); }
 .pd-body, .pd-bead { position: absolute; display: block; }
+/* while it floats it's a plain pill: one slow bob the compositor runs by itself */
+.pd-pill {
+  position: absolute; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, .24);
+  animation: pd-float 2.4s ease-in-out infinite;
+}
+@keyframes pd-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+body.no-anim .pd-pill { animation: none; }
 .pd-text {
-  position: absolute; transform: translate(-50%, -50%); white-space: nowrap; opacity: 0;
-  display: flex; align-items: center; gap: 6px; color: var(--text-1);
-  font: 600 13px/1 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  display: flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--text-1); opacity: 0;
+  font: 600 13px/1 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; transition: opacity .16s ease;
 }
 .pd-text::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: rgb(var(--accent-rgb)); flex: none; }
