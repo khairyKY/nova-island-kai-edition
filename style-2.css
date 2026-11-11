@@ -151,7 +151,78 @@ body.no-anim .pd-pill { animation: none; }
 /* the island's edge: one electric pulse */
 #island.perf-burst .clip { animation: perf-pulse 1.1s cubic-bezier(.2, .7, .3, 1); }
 @keyframes perf-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(255, 108, 36, 0); }
-  22% { box-shadow: 0 0 0 1.5px rgba(255, 108, 36, .85), 0 0 22px 4px rgba(255, 108, 36, .5); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 108, 36, 0), 0 0 30px 10px rgba(255, 108, 36, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(255, 108, 36, .95), 0 0 0 0 rgba(255, 140, 50, .9), 0 0 0 0 rgba(255, 108, 36, 0); }
+  18% { box-shadow: 0 0 0 7px rgba(255, 108, 36, .45), 0 0 0 1.5px rgba(255, 140, 50, .95), 0 0 24px 6px rgba(255, 108, 36, .6); }
+  40% { box-shadow: 0 0 0 18px rgba(255, 108, 36, 0), 0 0 0 10px rgba(255, 140, 50, .4), 0 0 28px 8px rgba(255, 108, 36, .35); }
+  70% { box-shadow: 0 0 0 24px rgba(255, 108, 36, 0), 0 0 0 22px rgba(255, 140, 50, 0), 0 0 30px 8px rgba(255, 108, 36, .12); }
+  100% { box-shadow: 0 0 0 26px rgba(255, 108, 36, 0), 0 0 0 26px rgba(255, 140, 50, 0), 0 0 30px 10px rgba(255, 108, 36, 0); }
 }
+
+
+/* ---- Performance mode, at full power ----
+   the island charges, launches and rumbles; two shockwaves blast out of it; exhaust sparks fly
+   off its back end; the pill flashes with an energy surge; the needle slams into the redline */
+.l-toast.perf #t-label { font-style: italic; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.l-toast.perf #t-value { font-style: italic; font-weight: 700; }
+.l-toast.perf .ico-gauge { width: 19px; height: 19px; }
+/* the needle slams to the redline and shudders there */
+.l-toast.perf .g-needle { animation: perf-slam 1.3s cubic-bezier(.2, .9, .2, 1) .08s both; }
+@keyframes perf-slam {
+  0% { transform: rotate(-120deg); }
+  28% { transform: rotate(68deg); }
+  36% { transform: rotate(52deg); }
+  44% { transform: rotate(64deg); }
+  52% { transform: rotate(55deg); }
+  60% { transform: rotate(62deg); }
+  70% { transform: rotate(57deg); }
+  100% { transform: rotate(60deg); }
+}
+.l-toast.perf .ico-gauge { animation: perf-redline .9s steps(2, jump-none) .35s 3; }
+@keyframes perf-redline { 50% { filter: drop-shadow(0 0 7px rgba(255, 60, 20, 1)) brightness(1.3); } }
+/* an energy surge through the pill, then it drains */
+.l-toast.perf .t-speed { animation: perf-surge .9s cubic-bezier(.2, .7, .3, 1) both; }
+@keyframes perf-surge {
+  0% { box-shadow: inset 0 0 0 0 rgba(255, 108, 36, 0); }
+  12% { box-shadow: inset 0 0 22px 40px rgba(255, 120, 40, .6); }
+  100% { box-shadow: inset 0 0 0 0 rgba(255, 108, 36, 0); }
+}
+/* thicker, hotter streaks */
+.l-toast.perf .t-speed::before, .l-toast.perf .t-speed::after, .l-toast.perf .t-speed i { filter: drop-shadow(0 0 2px rgba(255, 108, 36, .9)); background-size: 40% 3px, 28% 2px, 48% 3px, 26% 2px, 36% 3px, 22% 2px; }
+
+/* the island charges (squeezes), launches (stretches) and rumbles */
+#island.perf-burst .clip { animation: perf-pulse 1.1s cubic-bezier(.2, .7, .3, 1), perf-launch .9s cubic-bezier(.3, .7, .2, 1); }
+@keyframes perf-launch {
+  0% { transform: none; }
+  10% { transform: scale(.93, 1.06); }
+  24% { transform: scale(1.1, .94); }
+  34% { transform: translateX(-3px) scale(1.02); }
+  40% { transform: translateX(2.5px); }
+  46% { transform: translateX(-2px) translateY(.5px); }
+  52% { transform: translateX(1.5px) translateY(-.5px); }
+  58% { transform: translateX(-1px); }
+  66% { transform: translateX(.6px); }
+  100% { transform: none; }
+}
+/* shockwaves and sparks live outside the clip, around the island */
+.perf-fx { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+#island.perf-burst .perf-fx { display: block; }
+/* exhaust sparks off the back (left) end, flung out and fading */
+.perf-fx .sparks { position: absolute; left: 6px; top: 50%; }
+.perf-fx .sparks b { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #ffd9b0;
+  box-shadow: 0 0 6px 2px rgba(255, 108, 36, .95); opacity: 0;
+  animation: perf-spark .6s cubic-bezier(.15, .6, .3, 1) both; }
+@keyframes perf-spark {
+  0% { transform: translate(0, 0) scale(1.2); opacity: 0; }
+  8% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(.2); opacity: 0; }
+}
+.perf-fx .sparks b:nth-child(1) { --dx: -46px; --dy: -14px; animation-delay: .14s; }
+.perf-fx .sparks b:nth-child(2) { --dx: -60px; --dy: 4px; animation-delay: .17s; }
+.perf-fx .sparks b:nth-child(3) { --dx: -38px; --dy: 16px; animation-delay: .2s; }
+.perf-fx .sparks b:nth-child(4) { --dx: -70px; --dy: -6px; animation-delay: .23s; }
+.perf-fx .sparks b:nth-child(5) { --dx: -52px; --dy: 11px; animation-delay: .26s; }
+.perf-fx .sparks b:nth-child(6) { --dx: -30px; --dy: -18px; animation-delay: .3s; }
+.perf-fx .sparks b:nth-child(7) { --dx: -64px; --dy: 18px; animation-delay: .34s; }
+.perf-fx .sparks b:nth-child(8) { --dx: -44px; --dy: -2px; animation-delay: .38s; }
+.perf-fx .sparks b:nth-child(9) { --dx: -76px; --dy: 9px; animation-delay: .42s; }
+.perf-fx .sparks b:nth-child(10) { --dx: -36px; --dy: 6px; animation-delay: .46s; }
