@@ -30,8 +30,10 @@
     clearTimeout(snapTimer);
     snapTimer = setTimeout(() => snap(mode), 700);
   }
+  // Graphics: Low keeps no pictures and draws no dust (it's all on the CPU there)
+  const low = () => state.features.graphics === 'low';
   async function snap(mode) {
-    if (anim || lastMode !== mode || !DUST_MODES.includes(mode) || state.moving || !state.visible) return;
+    if (low() || anim || lastMode !== mode || !DUST_MODES.includes(mode) || state.moving || !state.visible) return;
     const r = island.getBoundingClientRect();
     let pic;
     try { pic = await bridge.snapIsland({ x: r.left, y: r.top, width: r.width, height: r.height }); } catch { return; }
@@ -73,9 +75,22 @@
   // ---- the change ----
   function stop() {
     if (!anim) return;
+    const song = anim.hide === 'song-dusting';
     anim = null;
-    island.classList.remove('dusting');
+    island.classList.remove('dusting', 'song-dusting');
     canvas.hidden = true;
+    if (song) scheduleSnap(lastMode); // the pictures of this mode still show the old song
+  }
+  function start(a, hide) {
+    anim = a;
+    a.hide = hide;
+    island.classList.add(hide);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.ceil(innerWidth * dpr); canvas.height = Math.ceil(innerHeight * dpr);
+    layer.width = Math.ceil(canvas.width / 2); layer.height = Math.ceil(canvas.height / 2);
+    canvas.hidden = false;
+    Object.assign(a, { start: performance.now(), dpr, shown: false });
+    requestAnimationFrame(tick);
   }
   window.addEventListener('island:mode', (e) => {
     const { mode, prev } = e.detail;
@@ -96,7 +111,7 @@
     }
     stop();
     const from = snaps.get(key(prev)), to = snaps.get(key(mode));
-    if (state.features.softDust === false || state.features.noAnimations || reduced.matches) return;
+    if (state.features.softDust === false || state.features.noAnimations || reduced.matches || low()) return;
     if (!from || !to || !DUST_MODES.includes(mode) || !DUST_MODES.includes(prev) || big(mode) === big(prev) || !target || state.moving) return;
     // the island still has its old geometry this frame (its size transition hasn't moved yet)
     const ra = island.getBoundingClientRect();
@@ -105,16 +120,74 @@
     const dst = to.pts.map((p) => ({ x: rb.left + p.x, y: rb.top + p.y, c: p.c }));
     if (!src.length || !dst.length) return;
     const thanos = state.features.dustStyle === 'thanos';
-    anim = thanos ? snapSeed(src, dst, ra, rb) : softSeed(src, dst, ra);
-    anim.mode = mode; anim.prev = prev;
-    island.classList.add('dusting');
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.ceil(innerWidth * dpr); canvas.height = Math.ceil(innerHeight * dpr);
-    layer.width = Math.ceil(canvas.width / 2); layer.height = Math.ceil(canvas.height / 2);
-    canvas.hidden = false;
-    Object.assign(anim, { start: performance.now(), dpr, shown: false });
-    requestAnimationFrame(tick);
+    const a = thanos ? snapSeed(src, dst, ra, rb) : softSeed(src, dst, ra);
+    a.mode = mode; a.prev = prev;
+    start(a, 'dusting');
   });
+
+  // ---- a new song where one is showing: its words and artwork turn to dust and reform as the new
+  // song's, in place. The new song has never been on screen, so there's no picture of it: both are
+  // drawn here, off screen, from the elements' own places, fonts, colours and images.
+  const SONG = { compact: ['#c-art', '#c-title'], peek: ['#p-art', '#p-title', '#p-artist'], expanded: ['#m-art', '#m-title', '#m-artist'] };
+  const pad = document.createElement('canvas');
+  const pctx = pad.getContext('2d', { willReadFrequently: true });
+  function songEls() {
+    const sels = SONG[lastMode];
+    if (!sels || (lastMode === 'expanded' && state.tab !== 'media')) return [];
+    return sels.map((s) => $(s)).filter((el) => {
+      const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden';
+    });
+  }
+  function songGrains(els, art) { // art: the new song's decoded artwork, drawn in place of the <img>s
+    const box = island.getBoundingClientRect();
+    pad.width = Math.max(1, Math.ceil(box.width)); pad.height = Math.max(1, Math.ceil(box.height));
+    pctx.clearRect(0, 0, pad.width, pad.height);
+    for (const el of els) {
+      const r = el.getBoundingClientRect(), x = r.left - box.left, y = r.top - box.top;
+      pctx.save();
+      if (el.tagName === 'IMG') {
+        const img = art || el;
+        if (img.naturalWidth) {
+          pctx.beginPath();
+          pctx.roundRect(x, y, r.width, r.height, parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0);
+          pctx.clip();
+          const k = Math.max(r.width / img.naturalWidth, r.height / img.naturalHeight); // object-fit: cover
+          pctx.drawImage(img, x + (r.width - img.naturalWidth * k) / 2, y + (r.height - img.naturalHeight * k) / 2, img.naturalWidth * k, img.naturalHeight * k);
+        }
+      } else {
+        // the pill's title scrolls inside its box: clip to the box, draw where the words are now
+        const cs = getComputedStyle(el), c = (el.parentElement.classList.contains('c-title') ? el.parentElement : el).getBoundingClientRect();
+        pctx.beginPath(); pctx.rect(c.left - box.left, c.top - box.top, c.width, c.height); pctx.clip();
+        pctx.font = cs.font; pctx.fillStyle = cs.color; pctx.direction = cs.direction;
+        const rtl = cs.direction === 'rtl';
+        pctx.textAlign = rtl ? 'right' : 'left'; pctx.textBaseline = 'middle';
+        pctx.fillText(el.textContent, rtl ? x + r.width : x, y + r.height / 2);
+      }
+      pctx.restore();
+    }
+    const px = pctx.getImageData(0, 0, pad.width, pad.height).data, pts = [];
+    for (let y = 1.1; y < pad.height; y += 1.6) {
+      for (let x = 1.1; x < pad.width; x += 1.6) {
+        const i = ((y | 0) * pad.width + (x | 0)) * 4;
+        if (px[i + 3] > 90) pts.push({ x: box.left + x, y: box.top + y, c: `rgb(${px[i]},${px[i + 1]},${px[i + 2]})` });
+      }
+    }
+    const keep = Math.max(1, Math.ceil(pts.length / 6000));
+    return { pts: keep === 1 ? pts : pts.filter((_, i) => i % keep === 0), box };
+  }
+  window.songDust = {
+    can: () => state.features.softDust !== false && !state.features.noAnimations && !reduced.matches && !low() && !anim && songEls().length > 0,
+    // the old song as it's shown right now (before the new one is put in)
+    from: () => songGrains(songEls()),
+    // call with the new song already in place and hidden (the 'song-dusting' class)
+    play(from, art) {
+      const to = songGrains(songEls(), art);
+      if (!from.pts.length || !to.pts.length || anim) { island.classList.remove('song-dusting'); return; }
+      const a = state.features.dustStyle === 'thanos' ? snapSeed(from.pts, to.pts, from.box, to.box) : softSeed(from.pts, to.pts, from.box);
+      start(a, 'song-dusting');
+    },
+  };
 
   const hash = (i) => Math.abs(Math.sin(i * 12.9898) * 43758.5453 % 1);
 
@@ -161,7 +234,7 @@
     let blur;
     if (a.kind === 'soft') {
       // the real content comes back under the settling dust
-      if (t >= 0.5 && !a.shown) { a.shown = true; island.classList.remove('dusting'); }
+      if (t >= 0.5 && !a.shown) { a.shown = true; island.classList.remove(a.hide); }
       const fadeOut = 1 - glide((t - 0.5) / 0.5);
       const fadeIn = glide(t / 0.12); // the old content melts into its dust instead of vanishing
       for (const p of a.seed) {
@@ -177,7 +250,7 @@
       }
       blur = 0.8 + 2.6 * Math.sin(Math.PI * t);
     } else {
-      if (t >= 0.86 && !a.shown) { a.shown = true; island.classList.remove('dusting'); }
+      if (t >= 0.86 && !a.shown) { a.shown = true; island.classList.remove(a.hide); }
       const settle = 1 - glide((t - 0.86) / 0.14);
       const ash = (rgb, k) => `rgb(${rgb[0] + (ASH[0] - rgb[0]) * k | 0},${rgb[1] + (ASH[1] - rgb[1]) * k | 0},${rgb[2] + (ASH[2] - rgb[2]) * k | 0})`;
       // out: from 0 to ~0.7 of the change

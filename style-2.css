@@ -93,3 +93,5 @@ body.no-anim .pd-pill { animation: none; }
 .soft-dust { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
 /* the outgoing content still fades on its own transition; the incoming one waits for the dust */
 #island.dusting .layer { opacity: 0 !important; }
+/* a song -> song change: only the song's own artwork and words go to dust (views/soft-dust.js) */
+#island.song-dusting :is(#c-art, #c-title, #p-art, #p-title, #p-artist, #m-art, #m-art-glow, #m-title, #m-artist) { opacity: 0 !important; }

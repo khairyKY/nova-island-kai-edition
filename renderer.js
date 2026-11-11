@@ -771,24 +771,48 @@ const SWAP_IN = 440;   // new song in
 const away = (sel, up) => sel === '#m-art-glow' ? { opacity: 0 }
   : SONG_ART.includes(sel) ? { opacity: 0, transform: 'scale(.8)' }
   : { opacity: 0, transform: `translateY(${up ? -7 : 8}px)`, filter: 'blur(3px)' };
+function putInSong(thumb) {
+  const m = state.media;
+  if (m.has) {
+    if (thumb) { hasArtwork = true; setArt(`data:image/png;base64,${thumb}`, true); }
+    else if (!hasArtwork) setArt(placeholderArt(m.title + m.app, SOURCE_ACCENTS[m.source?.id]));
+    setSongText(m);
+  }
+  render(); // the pill's title
+}
+// The old song turns to soft dust and reforms as the new one (views/soft-dust.js); with the dust
+// off it slides out and the new one slides in instead.
 function startSongSwap(key) {
   const s = swap = { key, thumb: '', at: performance.now() };
-  for (const sel of [...SONG_ART, ...SONG_TEXT]) {
-    const el = $(sel);
-    el.getAnimations().forEach((a) => a.cancel());
-    el.animate([{}, away(sel, true)], { duration: SWAP_OUT, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' });
+  const dust = !!window.songDust?.can();
+  if (!dust) {
+    for (const sel of [...SONG_ART, ...SONG_TEXT]) {
+      const el = $(sel);
+      el.getAnimations().forEach((a) => a.cancel());
+      el.animate([{}, away(sel, true)], { duration: SWAP_OUT, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' });
+    }
   }
-  const bringIn = () => {
+  const bringIn = async () => {
     if (swap !== s) return; // another song came first: its swap carries on from here
     if (!s.thumb && performance.now() - s.at < SWAP_WAIT) { setTimeout(bringIn, 40); return; }
-    swap = null;
-    const m = state.media;
-    if (m.has) {
-      if (s.thumb) { hasArtwork = true; setArt(`data:image/png;base64,${s.thumb}`, true); }
-      else if (!hasArtwork) setArt(placeholderArt(m.title + m.app, SOURCE_ACCENTS[m.source?.id]));
-      setSongText(m);
+    if (dust) {
+      // the new artwork decoded first, so it goes into the dust and onto the island in one go
+      let art = null;
+      if (s.thumb) {
+        art = new Image();
+        art.src = `data:image/png;base64,${s.thumb}`;
+        await art.decode().catch(() => { art = null; });
+        if (swap !== s) return;
+      }
+      const from = window.songDust.from(); // the old song as it's shown, before it goes
+      island.classList.add('song-dusting');
+      swap = null;
+      putInSong(s.thumb);
+      window.songDust.play(from, art);
+      return;
     }
-    render(); // the pill's title
+    swap = null;
+    putInSong(s.thumb);
     SONG_ART.concat(SONG_TEXT).forEach((sel, i) => {
       const el = $(sel);
       el.getAnimations().forEach((a) => a.cancel());
@@ -796,7 +820,7 @@ function startSongSwap(key) {
       el.animate([away(sel, false), {}], { duration: SWAP_IN, delay: SONG_ART.includes(sel) ? 0 : 60 + i * 12, easing: 'cubic-bezier(.2, .9, .3, 1.08)', fill: 'backwards' });
     });
   };
-  setTimeout(bringIn, SWAP_OUT);
+  setTimeout(bringIn, dust ? 0 : SWAP_OUT);
 }
 
 function setPlayingUI(playing) {
