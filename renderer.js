@@ -212,7 +212,14 @@ function reportRect() {
   // something on the island to click (a toast with a button, a reminder or a scene): over the
   // browser in "Stay in place" it takes the mouse again for as long as it's there
   const clickable = (lastMode === 'toast' && (!!state.toastAction || NOTICES.includes(state.toast)) && Date.now() < state.toastUntil) || lastMode === 'reminder' || lastMode === 'scene';
+  // While the island shrinks the hitbox is already the final, smaller shape (so the cursor can't
+  // slip out of a half-shrunk island and flicker it). While it grows, the hitbox is what's drawn:
+  // leaving the island mid-open closes it from right there.
   let r = target && !state.moving ? target : island.getBoundingClientRect();
+  if (target && !state.moving) {
+    const now = island.getBoundingClientRect();
+    if (now.width * now.height < target.width * target.height - 1) r = now;
+  }
   // during a scene the card beside the character must take the mouse too
   if (lastMode === 'scene') {
     const c = $('#scene-card').getBoundingClientRect();

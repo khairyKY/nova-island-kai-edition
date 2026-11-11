@@ -42,7 +42,9 @@ const DEFAULTS = {
   kaiTestNotices: true,
   kaiNoticeStyle: 'card',
   kaiNoticeSeconds: 8,
-  softDust: true, // opening and closing: the content turns to soft dust and reforms (views/soft-dust.js)
+  softDust: true, // opening and closing: the content turns to dust and reforms (views/soft-dust.js)
+  dustStyle: 'soft', // 'soft' drifts into the new layout; 'thanos' disintegrates and blows back in
+  dustSpeed: 'normal', // slow / normal / fast
   appNotices: true, // other apps' notices on the island (Claude Code, through its hooks)
   // performance (the battery saver turns all three on while the battery is low)
   noBlur: false, // solid island, no screen capture at all
@@ -107,6 +109,8 @@ const RANGES = {
 const CHOICES = {
   companionStyle: ['phoenix', 'zaher-seated', 'zaher-standing', 'classic', 'none'],
   kaiNoticeStyle: ['card', 'compact'],
+  dustStyle: ['soft', 'thanos'],
+  dustSpeed: ['slow', 'normal', 'fast'],
   theme: ['kai-day', 'kai-night', 'kai-fern-day', 'kai-fern-night', 'original', 'bakka', 'outline', 'midnight', 'forest', 'snow', 'cat', 'galaxy', 'aurora', 'ocean', 'nody', 'lava', 'retro'],
 };
 // themes without glass: no screen capture behind them

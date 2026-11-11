@@ -108,6 +108,9 @@ function showFeatures(f) {
   $('[data-feature="autoUpdate"]').disabled = !!f.localBuild;
   $('#kai-notice-settings').hidden = !f.kaiPlugin;
   $$('[data-kai-style]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.kaiStyle === f.kaiNoticeStyle)));
+  const dust = f.softDust === false ? 'off' : f.dustStyle || 'soft';
+  $$('[data-dust]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.dust === dust)));
+  $$('[data-dust-speed]').forEach((b) => { b.setAttribute('aria-checked', String(b.dataset.dustSpeed === (f.dustSpeed || 'normal'))); b.disabled = dust === 'off'; });
   $$('[data-kai-preview]').forEach((b) => { b.disabled = !f.kaiNotifications; });
   $$('.th-card').forEach((c) => {
     c.hidden = c.dataset.theme.startsWith('kai-') && !f.kaiPlugin;
@@ -124,6 +127,15 @@ function showFeatures(f) {
     : 'Stays where it is; clicks go to the tabs below';
   showSteppers();
 }
+$$('[data-dust-speed]').forEach((b) => b.addEventListener('click', () => {
+  api.setFeatures({ dustSpeed: b.dataset.dustSpeed });
+  saved();
+}));
+$$('[data-dust]').forEach((b) => b.addEventListener('click', () => {
+  const d = b.dataset.dust;
+  api.setFeatures(d === 'off' ? { softDust: false } : { softDust: true, dustStyle: d });
+  saved();
+}));
 $$('[data-kai-style]').forEach((b) => b.addEventListener('click', () => {
   api.setFeatures({ kaiNoticeStyle: b.dataset.kaiStyle });
   saved();

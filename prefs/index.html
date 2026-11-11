@@ -79,6 +79,20 @@
           <h2>Performance</h2>
           <div class="card">
             <label class="row"><div class="txt"><b>Remove blur</b><small>A solid island; the screen is not captured</small></div><input type="checkbox" class="sw" data-feature="noBlur"></label>
+            <div class="row" data-needs="!noAnimations"><div class="txt"><b>Dust on open and close</b><small>The content turns to dust and reforms</small></div>
+              <div class="seg" role="radiogroup" aria-label="Dust on open and close">
+                <button role="radio" data-dust="off">Off</button>
+                <button role="radio" data-dust="soft">Soft</button>
+                <button role="radio" data-dust="thanos">Thanos snap</button>
+              </div>
+            </div>
+            <div class="row" data-needs="!noAnimations"><b>Dust speed</b>
+              <div class="seg" role="radiogroup" aria-label="Dust speed">
+                <button role="radio" data-dust-speed="slow">Slow</button>
+                <button role="radio" data-dust-speed="normal">Normal</button>
+                <button role="radio" data-dust-speed="fast">Fast</button>
+              </div>
+            </div>
             <label class="row"><b>Remove animations</b><input type="checkbox" class="sw" data-feature="noAnimations"></label>
             <label class="row" data-needs="!noBlur"><div class="txt"><b>Freeze glass while closed</b><small>The glass refreshes only while the island is open</small></div><input type="checkbox" class="sw" data-feature="glassFreeze"></label>
             <label class="row" id="saver-row"><div class="txt"><b>Battery saver</b><small id="saver-note">Turns all three on when the battery runs low</small></div><input type="checkbox" class="sw" data-feature="batterySaver"></label>
