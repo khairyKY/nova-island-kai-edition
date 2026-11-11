@@ -17,6 +17,15 @@
   // Code's hook): a second Claude notice within a few seconds is the same news
   const lastAt = new Map();
   const sender = (n) => (n.app === 'claude' || /^Claude_/.test(n.aumid || '') ? 'claude' : n.aumid || n.app);
+  // The same news through two doors: an app that also sends its notices to the island directly
+  // (Kai's Flow, Claude Code's hooks) raises a Windows notification too, which is mirrored here.
+  // Titles seen in the last few seconds are remembered, and a mirrored copy of one is dropped.
+  const KAIS_FLOW = 'com.kaisflow.garden';
+  const recent = [];
+  const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const seen = (title) => { recent.push([norm(title), Date.now()]); while (recent.length > 20) recent.shift(); };
+  const seenRecently = (title) => { const t = norm(title); return !!t && recent.some(([r, at]) => Date.now() - at < 10000 && (r === t || r.startsWith(t) || t.startsWith(r))); };
+  bridge.onKaiNotice((n) => seen(n.title));
 
   function show(n) {
     const known = KNOWN[n.app] || {};
@@ -63,9 +72,14 @@
     if (state.features.appNotices === false) return;
     // Pady's quick notices never wait behind another: the drop hangs below the island
     if (notice.app === 'pady' && window.padyDrop) { if (state.visible) window.padyDrop(notice); return; }
+    const mirrored = !!notice.aumid && !KNOWN[notice.app];
+    // Kai's Flow's own notices come through its own channel (with its card) while that's on
+    if (mirrored && notice.aumid === KAIS_FLOW && state.features.kaiNotifications) return;
+    if (mirrored && seenRecently(notice.title)) return;
     const who = sender(notice);
-    if (who === 'claude' && Date.now() - (lastAt.get(who) || 0) < 4000) return;
+    if (who === 'claude' && Date.now() - (lastAt.get(who) || 0) < 12000) return;
     lastAt.set(who, Date.now());
+    seen(notice.title);
     if (queue.length >= 20) queue.shift();
     queue.push(notice);
     next();
