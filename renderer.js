@@ -84,9 +84,13 @@ function timerActive() {
 
 // What the compact pill shows, by priority: timer, playing media, a running download. (The radio
 // doesn't take the pill: the idle info keeps rotating, with a small "on air" mark by the prayer.)
+// between two songs a player reports "paused" for a moment: the pill holds on through it, so the
+// next song swaps in instead of the island collapsing and growing again
+const SONG_GAP_MS = 1200;
 function compactKind() {
   if (timerActive()) return 'timer';
-  if (feat('mediaPill') && state.media.has && state.media.playing && !state.mediaFront) return 'media';
+  const playing = state.media.playing || Date.now() - (state.playingAt || 0) < SONG_GAP_MS;
+  if (feat('mediaPill') && state.media.has && playing && !state.mediaFront) return 'media';
   if (state.dl.active) return 'dl';
   return '';
 }
@@ -111,7 +115,8 @@ function currentMode() {
 }
 
 let lastMode = '';
-const SIZE = { idle: 1, compact: 2, toast: 3, peek: 4, reminder: 4, scene: 4, expanded: 5 };
+let swap = null; // a song → song change in progress (startSongSwap)
+const SIZE ={ idle: 1, compact: 2, toast: 3, peek: 4, reminder: 4, scene: 4, expanded: 5 };
 
 function render() {
   const mode = currentMode();
@@ -143,7 +148,8 @@ function render() {
   const wide = showTitle;
   const changedWidth = wide !== island.classList.contains('c-wide');
   island.classList.toggle('c-wide', wide);
-  setCompactTitle(!showTitle ? '' : kind === 'media' ? state.media.title : state.dl.title);
+  // mid song → song swap the pill keeps the old title until the swap brings in the new one
+  setCompactTitle(!showTitle ? '' : kind === 'media' ? (swap && cTitle ? cTitle : state.media.title) : state.dl.title);
   $('.c-title').hidden = !showTitle;
   if (changedMode || changedWidth || changedToastSize) positionIsland();
   if (changedMode) {
@@ -741,6 +747,58 @@ function setArt(url, real = false) {
   });
 }
 
+function setSongText(m) {
+  $('#m-title').textContent = $('#p-title').textContent = m.title || 'Unknown';
+  const sub = m.artist || m.album || appName(m.app);
+  $('#m-artist').textContent = $('#p-artist').textContent = sub;
+  $('#p-eyebrow').textContent = `Now Playing · ${m.source?.name || appName(m.app) || 'Media'}`;
+}
+
+// ---- song → song: the old song slides out and the new one in, in place (no collapse between) ----
+const SONG_ART = ['#c-art', '#p-art', '#m-art', '#m-art-glow'];
+const SONG_TEXT = ['#c-title', '#p-title', '#p-artist', '#m-title', '#m-artist'];
+const SWAP_OUT = 170;  // old song away
+const SWAP_WAIT = 300; // the new artwork usually lands a moment after the title: wait for it, briefly
+// artwork that lands after the swap (or after a placeholder) fades in instead of popping
+function artArrives() {
+  for (const sel of SONG_ART) {
+    const el = $(sel);
+    if (!el.getAnimations().length) el.animate([{ opacity: 0, transform: sel === '#m-art-glow' ? 'none' : 'scale(.92)' }, {}], { duration: 260, easing: 'cubic-bezier(.2, .8, .3, 1)' });
+  }
+}
+const SWAP_IN = 440;   // new song in
+// implicit keyframes ({}) start/end at each element's own look (the glow keeps its blur and dimness)
+const away = (sel, up) => sel === '#m-art-glow' ? { opacity: 0 }
+  : SONG_ART.includes(sel) ? { opacity: 0, transform: 'scale(.8)' }
+  : { opacity: 0, transform: `translateY(${up ? -7 : 8}px)`, filter: 'blur(3px)' };
+function startSongSwap(key) {
+  const s = swap = { key, thumb: '', at: performance.now() };
+  for (const sel of [...SONG_ART, ...SONG_TEXT]) {
+    const el = $(sel);
+    el.getAnimations().forEach((a) => a.cancel());
+    el.animate([{}, away(sel, true)], { duration: SWAP_OUT, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' });
+  }
+  const bringIn = () => {
+    if (swap !== s) return; // another song came first: its swap carries on from here
+    if (!s.thumb && performance.now() - s.at < SWAP_WAIT) { setTimeout(bringIn, 40); return; }
+    swap = null;
+    const m = state.media;
+    if (m.has) {
+      if (s.thumb) { hasArtwork = true; setArt(`data:image/png;base64,${s.thumb}`, true); }
+      else if (!hasArtwork) setArt(placeholderArt(m.title + m.app, SOURCE_ACCENTS[m.source?.id]));
+      setSongText(m);
+    }
+    render(); // the pill's title
+    SONG_ART.concat(SONG_TEXT).forEach((sel, i) => {
+      const el = $(sel);
+      el.getAnimations().forEach((a) => a.cancel());
+      // the artwork first, the words a beat behind it
+      el.animate([away(sel, false), {}], { duration: SWAP_IN, delay: SONG_ART.includes(sel) ? 0 : 60 + i * 12, easing: 'cubic-bezier(.2, .9, .3, 1.08)', fill: 'backwards' });
+    });
+  };
+  setTimeout(bringIn, SWAP_OUT);
+}
+
 function setPlayingUI(playing) {
   const view = $('#v-media');
   view.classList.toggle('playing', playing);
@@ -848,6 +906,9 @@ bridge.onMedia((m) => {
     state.playLock = null;
   }
   state.media = m;
+  // the last moment it was playing (the gap counts from when it stopped)
+  if (m.playing || previous.playing) state.playingAt = Date.now();
+  if (!m.playing && previous.playing) setTimeout(render, SONG_GAP_MS + 30); // a real pause: collapse after the gap
   state.mediaAt = performance.now();
   state.mediaFront = isMediaInFront(m);
   updateMediaSource(m);
@@ -867,7 +928,12 @@ bridge.onMedia((m) => {
   const trackChanged = key !== lastTrack;
   const sourceChanged = m.source?.id !== previous.source?.id || m.source?.name !== previous.source?.name;
   if (key !== lastTrack) {
-    if (key && lastTrack && m.title && !state.mediaFront && feat('trackPeek')) {
+    const songToSong = key && lastTrack && m.title && !state.mediaFront;
+    // a song following a song where it's showing (the pill with its title, or the open panel):
+    // the two swap in place; otherwise the new track card
+    if (songToSong && !state.features.noAnimations && ((compactKind() === 'media' && feat('mediaTitle')) || lastMode === 'expanded')) {
+      startSongSwap(key);
+    } else if (songToSong && feat('trackPeek')) {
       state.peekUntil = Date.now() + 3200;
       setTimeout(render, 3300);
     }
@@ -878,20 +944,19 @@ bridge.onMedia((m) => {
   }
   const sourceColor = SOURCE_ACCENTS[m.source?.id];
   if (m.has && !artworkPalette && (trackChanged || sourceChanged)) setAccent(...(sourceColor || [107, 160, 215]));
-  if (m.thumb) {
+  if (swap) {
+    if (m.thumb) swap.thumb = m.thumb; // the swap brings it in with the title
+  } else if (m.thumb) {
+    const late = !hasArtwork && !trackChanged && !state.features.noAnimations;
     hasArtwork = true;
     setArt(`data:image/png;base64,${m.thumb}`, true);
+    if (late) artArrives();
   } else if (m.has && !hasArtwork && (trackChanged || sourceChanged)) {
     setArt(placeholderArt(m.title + m.app, sourceColor));
   }
   island.classList.toggle('artwork-accent', !!m.has);
 
-  if (m.has && (trackChanged || sourceChanged || m.album !== previous.album)) {
-    $('#m-title').textContent = $('#p-title').textContent = m.title || 'Unknown';
-    const sub = m.artist || m.album || appName(m.app);
-    $('#m-artist').textContent = $('#p-artist').textContent = sub;
-    $('#p-eyebrow').textContent = `Now Playing · ${m.source?.name || appName(m.app) || 'Media'}`;
-  }
+  if (!swap && m.has && (trackChanged || sourceChanged || m.album !== previous.album)) setSongText(m);
   if (trackChanged || sourceChanged || m.has !== previous.has) {
     $('#x-app-name').textContent = m.has ? m.source?.name || appName(m.app) || 'Media' : 'Idle';
     $('#v-media').classList.toggle('browser-src', m.has && BROWSERS.some((b) => (m.app || '').toLowerCase().includes(b)) && !(m.app || '').toLowerCase().includes('firefox'));
