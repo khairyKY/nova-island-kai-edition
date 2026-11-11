@@ -671,6 +671,8 @@ static class Program {
 
   static int bright = -1;
   static bool vlcShown; // the island is showing VLC, so play/pause/next/prev go to it
+  static bool vlcWasShown;          // last status showed VLC (a paused VLC stays shown)
+  static DateTime vlcSince = DateTime.MinValue; // when VLC started playing
 
   static void Handle(string cmd) {
     if (cmd == "@media") { Interlocked.Exchange(ref mediaQueued, 0); return; }
@@ -825,11 +827,23 @@ static class Program {
       try {
         if (Vlc.Find()) {
           vlcPlaying = Vlc.Playing();
+          if (!vlcPlaying) vlcSince = DateTime.MinValue;
+          else if (vlcSince == DateTime.MinValue) vlcSince = DateTime.UtcNow;
           var si = s == null ? null : s.GetPlaybackInfo();
           bool sessionPlaying = si != null && si.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
-          vlcShown = vlcPlaying ? !sessionPlaying : s == null;
+          // a session you can hear: playing, and (when its process is known) not muted or silent;
+          // Spotify playing on mute doesn't take the island from the video you're watching
+          string sid = s == null ? "" : s.SourceAppUserModelId ?? "";
+          bool exe = sid.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
+          bool sessionHeard = sessionPlaying && (!exe || Vlc.Audible(sid.Substring(0, sid.Length - 4)));
+          DateTime sessionSince;
+          if (!playingSince.TryGetValue(sid, out sessionSince)) sessionSince = DateTime.MinValue;
+          // playing: VLC unless a session you hear started after it; paused: VLC stays while it was
+          // the one shown (so play resumes the video, not Spotify) and nothing you hear is playing
+          vlcShown = vlcPlaying ? (!sessionHeard || vlcSince >= sessionSince) : (s == null || (vlcWasShown && !sessionHeard));
         }
       } catch { }
+      vlcWasShown = vlcShown;
       if (vlcShown) {
         o.Add("has", true).Add("title", Vlc.Title).Add("artist", "").Add("album", "")
          .Add("app", "vlc.exe").Add("playing", vlcPlaying).Add("pos", 0).Add("dur", 0);

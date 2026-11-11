@@ -75,9 +75,32 @@ static class Vlc {
   }
 
   // Playing = VLC's audio session is active (pause stops the stream) and made a sound in the
-  // last 10 s (a stopped player can leave the session open; quiet passages stay "playing").
+  // last 60 s (a stopped player can leave the session open; a lecture's pauses stay "playing").
   public static bool Playing() {
-    bool active = false;
+    bool active;
+    float peak = Peak(p => p == pid, out active);
+    // (an open stream on the first look counts as heard, so it doesn't start as "paused")
+    if (active && (peak > 0.0005f || heardAt == DateTime.MinValue)) heardAt = DateTime.UtcNow;
+    return active && (DateTime.UtcNow - heardAt).TotalSeconds < 60;
+  }
+
+  // Can it be heard? A process's audio sessions made a sound in the last 3 s (a muted app's
+  // meter reads zero). For telling a player you hear from one playing on mute.
+  static readonly System.Collections.Generic.Dictionary<string, DateTime> heard = new System.Collections.Generic.Dictionary<string, DateTime>();
+  public static bool Audible(string processName) {
+    var pids = new System.Collections.Generic.HashSet<uint>();
+    foreach (var proc in System.Diagnostics.Process.GetProcessesByName(processName)) { pids.Add((uint)proc.Id); proc.Dispose(); }
+    if (pids.Count == 0) return false;
+    bool active;
+    float peak = Peak(p => pids.Contains(p), out active);
+    if (active && peak > 0.0005f) heard[processName] = DateTime.UtcNow;
+    DateTime at;
+    return heard.TryGetValue(processName, out at) && (DateTime.UtcNow - at).TotalSeconds < 3;
+  }
+
+  // the loudest peak among the default output's audio sessions of the matching processes
+  static float Peak(Func<uint, bool> match, out bool active) {
+    active = false;
     float peak = 0;
     try {
       var en = (IMMDeviceEnumerator)(new MMDeviceEnumeratorComObject());
@@ -95,7 +118,7 @@ static class Vlc {
         if (list.GetSession(i, out s) != 0 || s == null) continue;
         var c = s as IAudioSessionControl2;
         uint p;
-        if (c == null || c.GetProcessId(out p) != 0 || p != pid) continue;
+        if (c == null || c.GetProcessId(out p) != 0 || !match(p)) continue;
         int state;
         if (c.GetState(out state) == 0 && state == 1) active = true;
         var meter = s as IAudioMeterInformation;
@@ -103,8 +126,7 @@ static class Vlc {
         if (meter != null && meter.GetPeakValue(out v) == 0 && v > peak) peak = v;
       }
     } catch { }
-    if (active && peak > 0.0005f) heardAt = DateTime.UtcNow;
-    return active && (DateTime.UtcNow - heardAt).TotalSeconds < 10;
+    return peak;
   }
 
   // toggle | next | prev
