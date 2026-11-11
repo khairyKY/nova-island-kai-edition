@@ -1,0 +1,25 @@
+[
+  {
+    "version": "1.7.20",
+    "summary": "Battery saver now, Performance mode, animation previews, Arabic notices",
+    "items": [
+      { "icon": "⚡", "title": "Battery saver now", "text": "One switch for the island and the PC: 60 Hz, the Balanced plan, Windows' animations and transparency off and Windows' Battery saver while unplugged. Switched off, everything comes back and the PC goes to Ultimate Performance. Settings › Island › Performance." },
+      { "icon": "🏁", "title": "Performance mode", "text": "Switching the saver off launches the island: a revving gauge, shockwaves, sparks and speed streaks. Every battery notice now has its own animation too: saver on, stays on, charging, low battery, unplugged." },
+      { "icon": "⌨️", "title": "A shortcut for it (opt-in)", "text": "Ctrl+Alt+B switches the saver from anywhere, or from a touchpad gesture in Pady. Off unless you turn it on." },
+      { "icon": "🎬", "title": "Preview animations", "text": "Settings › Island › Preview animations plays any of the island's animations on demand, from made-up data." },
+      { "icon": "🌍", "title": "Right-to-left notices", "text": "Arabic, Hebrew and Persian messages read and scroll right to left, even when the sender's name is in Latin letters." },
+      { "icon": "🖼️", "title": "Fuller app icons", "text": "App logos that Windows hands over with wide empty margins are trimmed, so they fill their place." }
+    ]
+  },
+  {
+    "version": "1.7.19",
+    "summary": "Songs turn to dust and reform, faster skips, better Now Playing",
+    "items": [
+      { "icon": "🎵", "title": "Song changes", "text": "The old song turns to soft dust and reforms as the new one, in the pill or in the Now Playing card. Settings › Island › Song change." },
+      { "icon": "⏭️", "title": "Faster skips", "text": "A skip shows on the island in about 0.4 s (it was up to 3 s)." },
+      { "icon": "🎧", "title": "Now Playing follows the right player", "text": "Apps that copy Spotify's song (like Spotifast) no longer confuse it, a paused VLC video stays on the island so play resumes it, and a player on mute doesn't take over." },
+      { "icon": "🪶", "title": "Lighter on Low", "text": "Graphics › Low uses less memory." },
+      { "icon": "🕌", "title": "The adhan", "text": "The companion always comes for the adhan, even right after the PC wakes up." }
+    ]
+  }
+]

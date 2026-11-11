@@ -35,7 +35,9 @@ jobs:
         shell: bash
         run: |
           V=$(node -p "require('./package.json').version")
-          gh release view "v$V" >/dev/null 2>&1 || gh release create "v$V" --title "$V" --notes "Nova Island Kai Edition $V"
+          # the notes: this version's entry in whats-new.json (the same list the app shows after updating)
+          NOTES=$(node -e "const e=require('./whats-new.json').find(x=>x.version===process.argv[1]);console.log(e?e.items.map(i=>'- '+i.icon+' **'+i.title+'**: '+i.text).join('\n'):'Nova Island Kai Edition '+process.argv[1])" "$V")
+          gh release view "v$V" >/dev/null 2>&1 || gh release create "v$V" --title "$V" --notes "$NOTES"
           gh release upload "v$V" --clobber "dist/Nova-Island-Kai-Edition-Setup-$V.exe" "dist/Nova-Island-Kai-Edition-Setup-$V.exe.blockmap" dist/latest.yml
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

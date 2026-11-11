@@ -286,3 +286,11 @@ body.searching .chip.miss { display: none !important; }
 .preview-btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .preview-btns .btn { height: 28px; padding: 0 11px; font-size: 12px; }
 .group > .hint { margin: 8px 4px 0; font-size: 12px; color: var(--text-2); }
+
+/* What's new */
+.wn-version { display: flex; align-items: baseline; gap: 8px; margin: 22px 4px 8px; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.wn-version:first-child { margin-top: 4px; }
+.wn-version .new { padding: 1px 7px; border-radius: 99px; background: var(--accent); color: #fff; font-size: 11px; }
+.wn-item { display: flex; gap: 12px; align-items: flex-start; }
+.wn-item .ico { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: rgba(255, 255, 255, .07); font-size: 16px; }
+.wn-item small { display: block; margin-top: 2px; line-height: 1.45; }

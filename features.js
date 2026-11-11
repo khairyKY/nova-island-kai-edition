@@ -52,6 +52,7 @@ const DEFAULTS = {
   noAnimations: false,
   glassFreeze: true, // refresh the glass on opening and moving, not while it sits closed
   graphics: 'veryHigh', // how it's drawn, memory against smoothness (nova.js, applied on a restart)
+  saverShortcut: false, // Ctrl+Alt+B (Pady's 4-finger hold) switches Battery saver now: opt-in, it changes the PC's settings
   saverNow: false, // switched by hand (Settings, the tray, Ctrl+Alt+B, Pady): the island's saver + Windows' Battery saver
   batterySaver: false,
   batterySaverAt: 20, // percent

@@ -587,3 +587,29 @@ api.onUpdate((u) => showUpdate({ status: 'ready', version: u?.version }));
 
 // Preview animations: played on the island (views/previews.js)
 $$('[data-preview]').forEach((b) => b.addEventListener('click', () => api.previewAnimation(b.dataset.preview)));
+
+// ---- What's new: the notes in whats-new.json, newest first; what came since the version this was
+// updated from is marked New ----
+api.whatsNew().then(({ current, from, entries }) => {
+  const isNew = (v) => from !== null && from !== undefined && (from === '' ? v === current : v.localeCompare(from, undefined, { numeric: true }) > 0);
+  $('#wn-lead').textContent = from ? `Updated from ${from} to ${current}.` : from === '' ? `Updated to ${current}.` : `Nova Island ${current}.`;
+  const list = $('#wn-list');
+  for (const e of entries) {
+    const head = document.createElement('div');
+    head.className = 'wn-version';
+    head.textContent = e.version === current ? `${e.version} · this version` : e.version;
+    if (isNew(e.version)) { const n = document.createElement('span'); n.className = 'new'; n.textContent = 'New'; head.append(n); }
+    const card = document.createElement('div');
+    card.className = 'card';
+    for (const it of e.items) {
+      const row = document.createElement('div');
+      row.className = 'row wn-item';
+      const ico = document.createElement('span'); ico.className = 'ico'; ico.textContent = it.icon || '•';
+      const txt = document.createElement('div'); txt.className = 'txt';
+      const b = document.createElement('b'); b.textContent = it.title;
+      const sm = document.createElement('small'); sm.textContent = it.text;
+      txt.append(b, sm); row.append(ico, txt); card.append(row);
+    }
+    list.append(head, card);
+  }
+});

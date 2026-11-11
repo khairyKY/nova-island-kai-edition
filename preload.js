@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('nova', {
   onReminderNow: on('reminder-now'),
   onPhoenixPreview: on('phoenix-preview'),
   onAnimationPreview: on('animation-preview'),
+  onWhatsNew: on('whats-new'),
   onVisibility: on('visibility'),
   onPrivacy: on('privacy'),
   onCalendar: on('calendar'),

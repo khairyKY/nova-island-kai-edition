@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('prefs', {
   browserCompanionFolder: () => ipcRenderer.send('browser-companion-folder'),
   setFeatures: (patch) => ipcRenderer.send('features-set', patch),
   previewAnimation: (id) => ipcRenderer.send('animation-preview', id),
+  whatsNew: () => ipcRenderer.invoke('whats-new'),
   resetFeatures: () => ipcRenderer.send('features-reset'),
   onFeatures: on('features'),
   general: () => ipcRenderer.invoke('general-get'),

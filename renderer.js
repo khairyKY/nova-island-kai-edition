@@ -1497,6 +1497,17 @@ window.saverToast = (s) => s.perf ? performanceMode(s) : showToast(s.stays ? 'sa
   s.stays ? 'Battery saver stays on' : s.on ? 'Battery saver is on' : 'Battery saver is off',
   s.stays ? `${s.pct}% · below ${s.at}%` : s.pct >= 0 ? `${s.pct}%` : '', 0, 3500);
 bridge.onSaver(window.saverToast);
+// just updated: the companion celebrates it, and its button opens Settings › What's new
+bridge.onWhatsNew((w) => {
+  const open = () => bridge.openSettings('whats-new');
+  const shown = window.playScene?.({
+    who: 'nova', phoenixPose: 'celebration', tone: 'gold', badge: '✨ Updated',
+    title: `Nova Island ${w.version}`, sub: w.summary, ms: 14000,
+    button: { label: 'See what’s new', onClick: open },
+  });
+  if (!shown) showToast('done', `Updated to ${w.version}`, 'What’s new', 0, 8000, open);
+  celebrate(['#ffd479', '#8ab4ff', '#ff9f0a']);
+});
 bridge.onVisibility((v) => {
   state.visible = !!v;
   syncProgress();

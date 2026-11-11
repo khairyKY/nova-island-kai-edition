@@ -950,6 +950,16 @@ async function pcSaver(on) {
   await fxGet();
   log.info(`pc battery saver ${on ? 'on' : 'off'}`);
 }
+// Ctrl+Alt+B switches it (Pady's 4-finger hold presses it): opt-in, since it changes the PC's settings
+let saverShortcutOn = false;
+function syncSaverShortcut() {
+  const want = !!features.get().saverShortcut;
+  if (want === saverShortcutOn) return;
+  saverShortcutOn = want;
+  if (!want) return globalShortcut.unregister('CommandOrControl+Alt+B');
+  if (!globalShortcut.register('CommandOrControl+Alt+B', toggleSaver)) log.info('Ctrl+Alt+B is taken by another app');
+}
+features.onChange(() => { if (app.isReady()) syncSaverShortcut(); });
 const toggleSaver = () => { if (!saverSwitching) features.set({ saverNow: !features.get().saverNow }); };
 let saverNow = features.get().saverNow;
 let saverSwitching = false;
@@ -1397,7 +1407,7 @@ function appMenu() {
       click: (item) => { setStartWithWindows(item.checked); notifyGeneral(); },
     }]),
     { label: 'Expand / collapse   Ctrl+Alt+I', click: () => send('toggle') },
-    { label: 'Battery saver   Ctrl+Alt+B', type: 'checkbox', checked: features.get().saverNow, click: toggleSaver },
+    { label: features.get().saverShortcut ? 'Battery saver   Ctrl+Alt+B' : 'Battery saver', type: 'checkbox', checked: features.get().saverNow, click: toggleSaver },
     { label: 'Settings…', click: () => prefsWindow.open() },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
@@ -1418,7 +1428,7 @@ function generalState() {
 function notifyGeneral() {
   prefsWindow.send('general', generalState());
 }
-ipcMain.on('open-settings', (_e, page) => prefsWindow.open(page === 'island' ? 'island' : undefined));
+ipcMain.on('open-settings', (_e, page) => prefsWindow.open(['island', 'whats-new'].includes(page) ? page : undefined));
 const mediaSettingsSender = e => (win && e.sender === win.webContents) || prefsWindow.owns(e.sender);
 ipcMain.handle('spotify-status', e => mediaSettingsSender(e) ? spotify?.snapshot() || {connected:false} : null);
 ipcMain.handle('spotify-connect', (e, clientId) => mediaSettingsSender(e) ? spotify?.connect(clientId) : {ok:false});
@@ -1442,8 +1452,34 @@ function openNovaLink(link) {
   else if (/^https:\/\//.test(link || '')) shell.openExternal(link);
 }
 // the island page reports once all its scripts ran (an early error would stop it before this)
+// --- What's new: after an update the island says so, and Settings › What's new shows what changed ---
+const WHATS_NEW = (() => { try { return require('./whats-new.json'); } catch { return []; } })();
+const newerThan = (a, b) => {
+  const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+};
+let updatedFrom; // the version it was before this start ('' = an earlier one, null = not an update)
+function checkUpdated() {
+  if (updatedFrom !== undefined) return updatedFrom;
+  const v = app.getVersion();
+  const seen = settings.load('seen-version.json', null)?.version;
+  // versions before this one didn't keep it: settings already there means it's an update, not a new install
+  const existing = fs.existsSync(path.join(app.getPath('userData'), 'features.json'));
+  updatedFrom = seen ? (newerThan(v, seen) ? seen : null) : existing ? '' : null;
+  if (seen !== v) settings.save('seen-version.json', { version: v });
+  return updatedFrom;
+}
+ipcMain.handle('whats-new', () => ({ current: app.getVersion(), from: checkUpdated(), entries: WHATS_NEW }));
+let whatsNewShown = false;
 ipcMain.on('island-ready', () => {
   log.info('island ready');
+  // updated: once, a few seconds in, the island says so (its button opens Settings › What's new)
+  if (checkUpdated() !== null && !whatsNewShown) {
+    whatsNewShown = true;
+    const entry = WHATS_NEW.find((e) => e.version === app.getVersion());
+    if (entry) setTimeout(() => send('whats-new', { version: entry.version, summary: entry.summary }), 4000);
+  }
   // the saver still on from before (a PC restart brings 60 Hz back to normal): the PC's part again
   if (features.get().saverNow && !saverApplied) { saverApplied = true; pcSaver(true).catch(() => {}); }
   // restarted by the battery saver switch (for Graphics > Low): the notice it would have shown
@@ -1766,7 +1802,7 @@ app.whenReady().then(() => {
     send('toggle');
   });
   // battery saver on / off (Pady's 4-finger hold presses this)
-  if (!globalShortcut.register('CommandOrControl+Alt+B', toggleSaver)) log.info('Ctrl+Alt+B is taken by another app');
+  syncSaverShortcut();
   screen.on('display-metrics-changed', refreshPlacement);
   screen.on('display-added', refreshPlacement);
   screen.on('display-removed', refreshPlacement);
