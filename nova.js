@@ -740,7 +740,7 @@ async function shotToShelf(until = 0) {
 }
 ipcMain.on('shot-to-shelf', () => shotToShelf());
 
-const MEDIA_CMD = /^(toggle|next|prev|mute|seek \d+(\.\d+)?|vol [01](\.\d+)?|bright \d{1,3}|duck 0(\.\d+)?|unduck)$/;
+const MEDIA_CMD = /^(toggle|next|prev|mute|seek \d+(\.\d+)?|vol [01](\.\d+)?|bright \d{1,3}|duck 0(\.\d+)?|unduck|pauseall)$/;
 ipcMain.on('media-cmd', (_e, cmd) => {
   if (media && typeof cmd === 'string' && MEDIA_CMD.test(cmd)) media.stdin.write(cmd + '\n');
 });
@@ -1195,8 +1195,9 @@ function pushNear(v) {
 }
 function sendNear(x, y) {
   const f = features.get();
-  const artwork = companionStates.usesArtwork(f.companionStyle || 'phoenix');
-  const follows = artwork ? f.phoenixIdle || (f.companionStyle !== 'zaher-standing' && (f.phoenixBlink || f.phoenixLookLeft || f.phoenixLookRight))
+  const style = companionStates.effective(f);
+  const artwork = companionStates.usesArtwork(style);
+  const follows = artwork ? f.phoenixIdle || (style !== 'zaher-standing' && (f.phoenixBlink || f.phoenixLookLeft || f.phoenixLookRight || f.phoenixLookAround))
     : f.companionStyle === 'classic' && f.novaEyes && !perfSlow();
   if (!follows || !islandRect.width) {
     if (nearSent) {

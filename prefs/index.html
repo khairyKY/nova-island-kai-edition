@@ -121,7 +121,7 @@
             <div class="row previews"><b>Music</b><div class="preview-btns"><button class="btn" data-preview="song-pill">Song change · Pill</button><button class="btn" data-preview="song-card">Song change · Card</button></div></div>
             <div class="row previews"><b>Notices</b><div class="preview-btns"><button class="btn" data-preview="pady-drop">Pady drop</button><button class="btn" data-preview="app-notice">App notice</button><button class="btn" data-preview="kai-notice">Kai’s Flow</button><button class="btn" data-preview="volume">Volume</button><button class="btn" data-preview="brightness">Brightness</button></div></div>
             <div class="row previews"><b>Power</b><div class="preview-btns"><button class="btn" data-preview="saver-on">Battery saver on</button><button class="btn" data-preview="saver-stays">Saver stays on</button><button class="btn" data-preview="saver-off">Saver off</button><button class="btn" data-preview="saver-suggest">Saver suggestion</button><button class="btn" data-preview="performance">Performance mode</button><button class="btn" data-preview="charging">Charging</button><button class="btn" data-preview="low-battery">Low battery</button><button class="btn" data-preview="on-battery">On battery</button></div></div>
-            <div class="row previews"><b>Companion</b><div class="preview-btns"><button class="btn" data-preview="adhan">Adhan</button><button class="btn" data-preview="prayer-nudge">Prayer reminder</button><button class="btn" data-preview="water">Water</button><button class="btn" data-preview="focus">Focus</button><button class="btn" data-preview="focus-done">Focus done</button><button class="btn" data-preview="celebration">Celebration</button></div></div>
+            <div class="row previews"><b>Companion</b><div class="preview-btns"><button class="btn" data-preview="adhan">Adhan</button><button class="btn" data-preview="water">Water</button><button class="btn" data-preview="focus">Focus</button><button class="btn" data-preview="focus-done">Focus done</button><button class="btn" data-preview="celebration">Celebration</button></div></div>
           </div>
           <p class="hint">Plays on the island now, from made-up data: nothing is switched and no song changes</p>
         </div>
@@ -211,15 +211,18 @@
         <div class="group">
           <h2>Character</h2>
           <div class="card"><div class="row companion-style-row"><b>Companion</b><div class="seg" role="radiogroup" aria-label="Companion character">
-            <button role="radio" data-companion-style="phoenix">Phoenix</button><button role="radio" data-companion-style="gazelle">Gazelle</button><button role="radio" data-companion-style="zaher-seated">Zaher seated</button><button role="radio" data-companion-style="zaher-standing">Zaher standing</button><button role="radio" data-companion-style="classic">Classic Nova</button><button role="radio" data-companion-style="none">Hidden</button>
-          </div></div></div>
+            <button role="radio" data-companion-style="phoenix">Phoenix</button><button role="radio" data-companion-style="gazelle">Gazelle</button><button role="radio" data-companion-style="zaher">Zaher</button><button role="radio" data-companion-style="classic">Classic Nova</button><button role="radio" data-companion-style="none">Hidden</button>
+          </div></div>
+          <div class="row sub" id="zaher-idle-row" hidden><div class="txt"><b>How Zaher waits</b><small>Beside the island while it’s idle. Standing doesn’t blink or follow the pointer; his other poses are the same</small></div>
+            <div class="seg" role="radiogroup" aria-label="How Zaher waits"><button role="radio" data-zaher-idle="seated">Seated</button><button role="radio" data-zaher-idle="standing">Standing</button></div>
+          </div></div>
           <p class="hint">Hiding a character or a pose keeps the reminder and its controls active.</p>
         </div>
         <div class="group" id="phoenix-settings">
           <h2 id="companion-state-heading">Phoenix states</h2>
           <div class="card" id="phoenix-options"></div>
           <p class="hint">Each pose has its own switch. Preview shows the artwork briefly without changing your switches. Blinking pauses when animations are off.</p>
-          <p class="hint" id="zaher-standing-hint" hidden>Zaher stands when idle and uses the compact poses for reminders. Choose Zaher seated for blinking and cursor reactions.</p>
+          
         </div>
         <div class="group" id="classic-companion-settings">
           <h2>Classic Nova</h2>
@@ -261,8 +264,9 @@
           <h2>Prayer</h2>
           <div class="card">
             <label class="row"><b>Prayer alerts</b><input type="checkbox" class="sw" data-feature="prayerAlerts"></label>
-            <label class="row sub" data-needs="prayerAlerts"><div class="txt"><b>Lower other sound at the adhan</b><small>Music and videos go down to 20 % while the adhan is on the island, and come back after</small></div><input type="checkbox" class="sw" data-feature="adhanDuck"></label>
-            <label class="row sub" data-needs="prayerAlerts"><div class="txt"><b>A gentle reminder</b><small>If you’re still at the PC ten minutes after the adhan, the companion asks once</small></div><input type="checkbox" class="sw" data-feature="prayerNudge"></label>
+            <div class="row sub" data-needs="prayerAlerts"><div class="txt"><b>Other sound at the adhan</b><small>Music and videos playing when the adhan comes</small></div>
+              <div class="seg" role="radiogroup" aria-label="Other sound at the adhan"><button role="radio" data-adhan-audio="pause">Pause</button><button role="radio" data-adhan-audio="lower">Lower</button><button role="radio" data-adhan-audio="leave">Leave</button></div>
+            </div>
             <label class="row"><b>Hanafi Asr</b><input type="checkbox" class="sw" data-feature="asrHanafi"></label>
             <div class="row"><div class="txt"><b>Hijri date</b><small>Match local moon sighting</small></div>
               <div class="stepper" data-num="hijriAdjust" data-steps="-2,-1,0,1,2" data-unit="day"><button data-dir="-1" aria-label="One day less">−</button><output></output><button data-dir="1" aria-label="One day more">+</button></div>

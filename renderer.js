@@ -317,7 +317,7 @@ let anchor = { x: window.innerWidth / 2, y: 8, docked: false, vertical: false, s
 function positionIsland() {
   let [w, h] = (anchor.vertical ? VDIMS : DIMS)[lastMode] || DIMS.idle;
   if (lastMode === 'toast' && state.toast === 'kai-flow') {
-    [w, h] = state.features.kaiNoticeStyle === 'compact' ? [380, 74] : [420, 110];
+    [w, h] = state.features.kaiNoticeStyle === 'compact' ? [400, 72] : [440, 96]; // (kai-notice.css)
   } else if (lastMode === 'toast' && !anchor.vertical && WIDE_TOASTS[state.toast]) {
     w = WIDE_TOASTS[state.toast];
   } else if (anchor.vertical && lastMode === 'toast' && !island.classList.contains('side-hud')) {
@@ -964,7 +964,10 @@ function onMediaUpdate(m) {
   syncHeld();
   updateMediaSource(m);
   const battery = $('#i-battery-group');
-  const batteryText = typeof m.bat === 'number' && m.bat >= 0 && m.bat <= 100 ? `${Math.round(m.bat)}%` : '';
+  // with the time left beside it: on battery Windows' estimate ("2h 10m"), charging the time to full
+  const short = (sec) => { const min = Math.round(sec / 60); return min >= 60 ? `${Math.floor(min / 60)}h${min % 60 ? ` ${min % 60}m` : ''}` : `${Math.max(1, min)}m`; };
+  const left = !m.ac && m.batLife > 0 ? short(m.batLife) : m.ac && chargeFullIn > 0 && m.bat < 100 ? `full ${short(chargeFullIn)}` : '';
+  const batteryText = typeof m.bat === 'number' && m.bat >= 0 && m.bat <= 100 ? `${Math.round(m.bat)}%${left ? ` · ${left}` : ''}` : '';
   const batteryChanged = $('#i-battery').textContent !== batteryText;
   if (batteryChanged || m.ac !== previous.ac) {
     battery.hidden = !batteryText;
@@ -1271,9 +1274,15 @@ function showHud(kind, value, muted) {
 }
 
 // ---------------- battery ----------------
+let chargeFullIn = 0; // seconds to a full battery while charging (0: unknown)
 if (navigator.getBattery) {
   navigator.getBattery().then((b) => {
     let lowShown = false;
+    // the time to full while charging, for the idle battery readout (Windows has no estimate for it)
+    const charge = () => { chargeFullIn = b.charging && Number.isFinite(b.chargingTime) ? b.chargingTime : 0; };
+    charge();
+    b.addEventListener('chargingtimechange', charge);
+    b.addEventListener('chargingchange', charge);
     // with the time left on battery when Windows knows it ("12% · ~25 min")
     const pct = () => [`${Math.round(b.level * 100)}%`, b.charging ? '' : timeLeft(b.dischargingTime)].filter(Boolean).join(' · ');
     b.addEventListener('chargingchange', () => {

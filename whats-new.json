@@ -1,25 +1,110 @@
 [
   {
+    "version": "1.7.21",
+    "summary": "The gazelle, companions that follow the pointer, focus apps, a quieter adhan",
+    "items": [
+      {
+        "icon": "🦌",
+        "title": "A new companion: the gazelle",
+        "text": "Settings › Companion › Gazelle. Every pose, from the morning welcome to the prayer rug."
+      },
+      {
+        "icon": "👀",
+        "title": "They follow the pointer",
+        "text": "The phoenix and the gazelle look up, down and to every side as the pointer moves around the island."
+      },
+      {
+        "icon": "🎯",
+        "title": "Focus apps",
+        "text": "While VLC (or any app you list) is in front, notices wait and come once you switch away. Settings › Alerts & Privacy."
+      },
+      {
+        "icon": "🕌",
+        "title": "The adhan pauses your music",
+        "text": "Whatever is playing is paused when the adhan comes. You can lower it instead, or leave it. Settings › Prayer & Dhikr. The next prayer also gets a time-left ring."
+      },
+      {
+        "icon": "🔋",
+        "title": "Battery time left",
+        "text": "Beside the battery: the time left on battery, or the time to full while charging, and in the battery notices. Before a class it won't last through, the island offers the saver."
+      },
+      {
+        "icon": "🌿",
+        "title": "Modern Kai's Flow notices",
+        "text": "An icon tile in the notice's colour, a clean title and body, and a line that runs down with its time."
+      },
+      {
+        "icon": "🧍",
+        "title": "One Zaher",
+        "text": "Zaher is one companion now; seated or standing is just how he waits beside the island."
+      }
+    ]
+  },
+  {
     "version": "1.7.20",
     "summary": "Battery saver now, Performance mode, animation previews, Arabic notices",
     "items": [
-      { "icon": "⚡", "title": "Battery saver now", "text": "One switch for the island and the PC: 60 Hz, the Balanced plan, Windows' animations and transparency off and Windows' Battery saver while unplugged. Switched off, everything comes back and the PC goes to Ultimate Performance. Settings › Island › Performance." },
-      { "icon": "🏁", "title": "Performance mode", "text": "Switching the saver off launches the island: a revving gauge, shockwaves, sparks and speed streaks. Every battery notice now has its own animation too: saver on, stays on, charging, low battery, unplugged." },
-      { "icon": "⌨️", "title": "A shortcut for it (opt-in)", "text": "Ctrl+Alt+B switches the saver from anywhere, or from a touchpad gesture in Pady. Off unless you turn it on." },
-      { "icon": "🎬", "title": "Preview animations", "text": "Settings › Island › Preview animations plays any of the island's animations on demand, from made-up data." },
-      { "icon": "🌍", "title": "Right-to-left notices", "text": "Arabic, Hebrew and Persian messages read and scroll right to left, even when the sender's name is in Latin letters." },
-      { "icon": "🖼️", "title": "Fuller app icons", "text": "App logos that Windows hands over with wide empty margins are trimmed, so they fill their place." }
+      {
+        "icon": "⚡",
+        "title": "Battery saver now",
+        "text": "One switch for the island and the PC: 60 Hz, the Balanced plan, Windows' animations and transparency off and Windows' Battery saver while unplugged. Switched off, everything comes back and the PC goes to Ultimate Performance. Settings › Island › Performance."
+      },
+      {
+        "icon": "🏁",
+        "title": "Performance mode",
+        "text": "Switching the saver off launches the island: a revving gauge, shockwaves, sparks and speed streaks. Every battery notice now has its own animation too: saver on, stays on, charging, low battery, unplugged."
+      },
+      {
+        "icon": "⌨️",
+        "title": "A shortcut for it (opt-in)",
+        "text": "Ctrl+Alt+B switches the saver from anywhere, or from a touchpad gesture in Pady. Off unless you turn it on."
+      },
+      {
+        "icon": "🎬",
+        "title": "Preview animations",
+        "text": "Settings › Island › Preview animations plays any of the island's animations on demand, from made-up data."
+      },
+      {
+        "icon": "🌍",
+        "title": "Right-to-left notices",
+        "text": "Arabic, Hebrew and Persian messages read and scroll right to left, even when the sender's name is in Latin letters."
+      },
+      {
+        "icon": "🖼️",
+        "title": "Fuller app icons",
+        "text": "App logos that Windows hands over with wide empty margins are trimmed, so they fill their place."
+      }
     ]
   },
   {
     "version": "1.7.19",
     "summary": "Songs turn to dust and reform, faster skips, better Now Playing",
     "items": [
-      { "icon": "🎵", "title": "Song changes", "text": "The old song turns to soft dust and reforms as the new one, in the pill or in the Now Playing card. Settings › Island › Song change." },
-      { "icon": "⏭️", "title": "Faster skips", "text": "A skip shows on the island in about 0.4 s (it was up to 3 s)." },
-      { "icon": "🎧", "title": "Now Playing follows the right player", "text": "Apps that copy Spotify's song (like Spotifast) no longer confuse it, a paused VLC video stays on the island so play resumes it, and a player on mute doesn't take over." },
-      { "icon": "🪶", "title": "Lighter on Low", "text": "Graphics › Low uses less memory." },
-      { "icon": "🕌", "title": "The adhan", "text": "The companion always comes for the adhan, even right after the PC wakes up." }
+      {
+        "icon": "🎵",
+        "title": "Song changes",
+        "text": "The old song turns to soft dust and reforms as the new one, in the pill or in the Now Playing card. Settings › Island › Song change."
+      },
+      {
+        "icon": "⏭️",
+        "title": "Faster skips",
+        "text": "A skip shows on the island in about 0.4 s (it was up to 3 s)."
+      },
+      {
+        "icon": "🎧",
+        "title": "Now Playing follows the right player",
+        "text": "Apps that copy Spotify's song (like Spotifast) no longer confuse it, a paused VLC video stays on the island so play resumes it, and a player on mute doesn't take over."
+      },
+      {
+        "icon": "🪶",
+        "title": "Lighter on Low",
+        "text": "Graphics › Low uses less memory."
+      },
+      {
+        "icon": "🕌",
+        "title": "The adhan",
+        "text": "The companion always comes for the adhan, even right after the PC wakes up."
+      }
     ]
   }
 ]

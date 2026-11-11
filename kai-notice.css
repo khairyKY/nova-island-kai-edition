@@ -1,0 +1,102 @@
+/* Kai's Flow (and Claude) notices, modern: an app-icon tile in the notice's colour, a small header
+   (where it's from · what kind, "now"), a clean title and body, a soft glow of its colour, a thin line
+   that runs down with its time, the close button on hover. Loaded last, over the theme's paper look.
+   views/kai-notices.js sets data-kind, data-source and --kai-dur. */
+#island.toast.kai-notice { --w: 440px; --h: 96px; --r: 26px; }
+#island.toast.kai-notice.kai-compact { --w: 400px; --h: 72px; --r: 24px; }
+
+#island.kai-notice {
+  --kn: 63, 143, 90;          /* the notice's colour (Kai's Flow green) */
+  --kn-ink: var(--text-1, #f2f2f5);
+  --kn-muted: var(--text-2, rgba(242, 242, 245, .66));
+}
+#island.kai-notice:has(.l-toast[data-kind="task_reminder"]) { --kn: 139, 92, 246; }
+#island.kai-notice:has(.l-toast[data-kind="focus_done"]) { --kn: 34, 197, 94; }
+#island.kai-notice:has(.l-toast[data-kind="overdue"]) { --kn: 239, 68, 68; }
+#island.kai-notice:has(.l-toast[data-kind="morning_digest"]) { --kn: 245, 158, 11; }
+#island.kai-notice:has(.l-toast[data-kind="evening_nudge"]) { --kn: 99, 102, 241; }
+#island.kai-notice:has(.l-toast[data-kind="test"]) { --kn: 14, 165, 233; }
+#island.kai-notice:has(.l-toast[data-kind^="claude_"]) { --kn: 217, 119, 87; }
+
+/* no paper, no leaf watermark: the island's own glass, a hairline, a glow of the notice's colour */
+body #island.kai-notice .clip::before { display: none !important; }
+body #island.kai-notice .l-toast {
+  background: radial-gradient(120% 160% at 0% 0%, rgba(var(--kn), .26), rgba(var(--kn), 0) 55%) !important;
+  border: 1px solid rgba(var(--kn), .22) !important;
+  color: var(--kn-ink) !important;
+  display: grid !important;
+  grid-template: "icon head" auto "icon title" auto "icon body" auto / 44px minmax(0, 1fr) !important;
+  align-content: center;
+  gap: 1px 12px !important;
+  padding: 0 40px 0 16px !important;
+  font-family: var(--font, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif) !important;
+}
+/* the icon tile: the notice's icon itself, on a tile of its colour (its text stays where it is) */
+body .l-toast.kai-flow .t-left { display: contents !important; }
+body .l-toast.kai-flow .t-left > svg { display: none !important; }
+body .l-toast.kai-flow .t-left > :is(.ico-sprout, .ico-bell) {
+  grid-area: icon; align-self: center; box-sizing: border-box;
+  width: 44px !important; height: 44px !important; padding: 11px; border-radius: 13px;
+  background: linear-gradient(145deg, rgba(var(--kn), 1), rgba(var(--kn), .72));
+  box-shadow: 0 4px 14px -4px rgba(var(--kn), .7), inset 0 1px 0 rgba(255, 255, 255, .28);
+  color: #fff !important; stroke: #fff;
+  animation: kn-pop .55s cubic-bezier(.3, 1.6, .45, 1) both;
+}
+#island.kai-compact .l-toast.kai-flow .t-left > :is(.ico-sprout, .ico-bell) { width: 38px !important; height: 38px !important; padding: 9px; border-radius: 11px; }
+body .l-toast.kai-flow .t-left > .ico-sprout { display: block !important; }
+body .l-toast.kai-flow:is([data-kind="task_reminder"], [data-kind="overdue"], [data-kind="evening_nudge"]) .t-left > .ico-sprout { display: none !important; }
+body .l-toast.kai-flow:is([data-kind="task_reminder"], [data-kind="overdue"], [data-kind="evening_nudge"]) .t-left > .ico-bell { display: block !important; }
+@keyframes kn-pop { from { transform: scale(.55) rotate(-8deg); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* header: where it's from and what kind, and "now" on the right */
+body .l-toast.kai-flow::before {
+  grid-area: head; content: attr(data-source);
+  font: 600 11.5px/1.3 var(--font, "Segoe UI Variable Text", "Segoe UI", sans-serif) !important;
+  letter-spacing: 0 !important; text-transform: none !important;
+  color: var(--kn-muted) !important;
+  animation: kn-rise .45s cubic-bezier(.2, .8, .2, 1) .08s both;
+}
+body .l-toast.kai-flow::after {
+  content: 'now'; position: absolute; top: 12px; inset-inline-end: 16px;
+  font: 500 11px/1 var(--font, "Segoe UI", sans-serif); color: var(--kn-muted); opacity: .8;
+  transition: opacity .2s;
+}
+#island.kai-notice:hover .l-toast.kai-flow::after { opacity: 0; }
+body .l-toast.kai-flow #t-label {
+  grid-area: title;
+  font: 650 15px/1.3 var(--font, "Segoe UI Variable Display", "Segoe UI", sans-serif) !important;
+  letter-spacing: -.005em; color: var(--kn-ink) !important;
+  -webkit-line-clamp: 1 !important;
+  animation: kn-rise .45s cubic-bezier(.2, .8, .2, 1) .14s both;
+}
+body .l-toast.kai-flow #t-value {
+  grid-area: body;
+  font: 400 13px/1.35 var(--font, "Segoe UI Variable Text", "Segoe UI", sans-serif) !important;
+  color: var(--kn-muted) !important; text-align: start !important; min-width: 0 !important;
+  -webkit-line-clamp: 2 !important;
+  animation: kn-rise .45s cubic-bezier(.2, .8, .2, 1) .2s both;
+}
+#island.kai-compact .l-toast.kai-flow #t-value { -webkit-line-clamp: 1 !important; }
+@keyframes kn-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* the time it stays, as a thin line along the bottom in its colour */
+body .l-toast.kai-flow .t-bar {
+  display: block !important; position: absolute; left: 22px; right: 22px; bottom: 7px; height: 2px;
+  border-radius: 2px; background: rgba(var(--kn), .14); overflow: hidden;
+}
+body .l-toast.kai-flow .t-bar b {
+  display: block; height: 100%; width: 100% !important; border-radius: 2px; background: rgba(var(--kn), .85);
+  transform-origin: left center; animation: kn-time var(--kai-dur, 8s) linear both;
+}
+#island.kai-notice:hover .l-toast.kai-flow .t-bar b { animation-play-state: paused; }
+@keyframes kn-time { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* the close button: small, only on hover */
+body .kai-notice-close {
+  top: 10px !important; width: 24px !important; height: 24px !important;
+  background: rgba(127, 127, 127, .18) !important; color: var(--kn-ink) !important;
+  opacity: 0; transition: opacity .2s, background .2s;
+}
+#island.kai-notice:hover .kai-notice-close { opacity: 1; }
+body .kai-notice-close svg { width: 12px !important; height: 12px !important; }
+body.no-anim .l-toast.kai-flow :is(.t-left > svg, #t-label, #t-value), body.no-anim .l-toast.kai-flow::before { animation: none; }

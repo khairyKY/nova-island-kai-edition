@@ -3,12 +3,14 @@ const $$ = (s) => document.querySelectorAll(s);
 const api = window.prefs;
 
 let features = {};
-$('#phoenix-options').innerHTML = PhoenixStates.map(pose => `<div class="row phoenix-option" data-companion-pose="${pose.id}">
+// the extra gazes are one row (one switch): the first of them stands for all
+$('#phoenix-options').innerHTML = PhoenixStates.filter((p, i, all) => !p.gaze || all.findIndex((q) => q.gaze) === i).map(pose => `<div class="row phoenix-option" data-companion-pose="${pose.id}">
   <label class="phoenix-state-label" for="${pose.key}"><img src="../${pose.src}" alt="" loading="lazy"><span class="txt"><b>${pose.label}</b><small>${pose.hint}</small></span></label>
   <button class="btn" data-phoenix-preview="${pose.id}" aria-label="Preview ${pose.label.toLowerCase()}">Preview</button>
   <input id="${pose.key}" type="checkbox" class="sw" data-feature="${pose.key}" aria-label="${pose.label} pose">
 </div>`).join('');
 $$('[data-companion-style]').forEach(button => button.addEventListener('click', () => { api.setFeatures({companionStyle:button.dataset.companionStyle});saved(); }));
+$$('[data-zaher-idle]').forEach(button => button.addEventListener('click', () => { api.setFeatures({zaherIdle:button.dataset.zaherIdle});saved(); }));
 $$('[data-phoenix-preview]').forEach(button => button.addEventListener('click', () => { api.previewPhoenix(button.dataset.phoenixPreview);saved('Previewing pose'); }));
 let spotifyInfo = {};
 function showSpotify(value) {
@@ -90,15 +92,18 @@ $('#themes').addEventListener('click', (e) => {
 // ---- feature switches ----
 function showFeatures(f) {
   features = f;
-  const companion = f.companionStyle || 'phoenix';
-  $$('[data-companion-style]').forEach(button => button.setAttribute('aria-checked',String(button.dataset.companionStyle === companion)));
+  const chosen = f.companionStyle || 'phoenix';
+  const companion = PhoenixStates.effective(f); // Zaher: seated or standing
+  $$('[data-companion-style]').forEach(button => button.setAttribute('aria-checked',String(button.dataset.companionStyle === chosen)));
+  $('#zaher-idle-row').hidden = chosen !== 'zaher';
+  $$('[data-zaher-idle]').forEach(button => button.setAttribute('aria-checked',String(button.dataset.zaherIdle === (f.zaherIdle || 'seated'))));
   $('#phoenix-settings').hidden = !PhoenixStates.usesArtwork(companion);
-  $('#companion-state-heading').textContent = PhoenixStates.isZaher(companion) ? 'Zaher states' : 'Phoenix states';
+  $('#companion-state-heading').textContent = PhoenixStates.isZaher(companion) ? 'Zaher states' : chosen === 'gazelle' ? 'Gazelle states' : 'Phoenix states';
   const standing = companion === 'zaher-standing';
-  $('#zaher-standing-hint').hidden = !standing;
   for (const pose of PhoenixStates) {
     const row = $(`[data-companion-pose="${pose.id}"]`);
-    row.hidden = standing && pose.id.startsWith('idle-');
+    if (!row) continue; // (the extra gazes share one row)
+    row.hidden = (standing && pose.id.startsWith('idle-')) || !PhoenixStates.has(pose.id, companion);
     const src = `../${PhoenixStates.sourceFor(pose,companion)}`;
     const image = row.querySelector('img');
     if (image.getAttribute('src') !== src) image.src = src;
@@ -111,6 +116,7 @@ function showFeatures(f) {
   const dust = f.softDust === false ? 'off' : f.dustStyle || 'soft';
   $$('[data-dust]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.dust === dust)));
   if (document.activeElement !== $('#focus-apps')) $('#focus-apps').value = f.focusApps ?? 'vlc';
+  $$('[data-adhan-audio]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.adhanAudio === (f.adhanAudio || 'pause'))));
   const sc = f.songChange || 'pill';
   $$('[data-song-change]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.songChange === sc)));
   $('#song-change-note').textContent = sc === 'card'
@@ -621,3 +627,5 @@ $('#focus-apps').addEventListener('input', (e) => {
   clearTimeout(focusTimer);
   focusTimer = setTimeout(() => { api.setFeatures({ focusApps: e.target.value }); saved(); }, 600);
 });
+
+$$('[data-adhan-audio]').forEach((b) => b.addEventListener('click', () => { api.setFeatures({ adhanAudio: b.dataset.adhanAudio }); saved(); }));

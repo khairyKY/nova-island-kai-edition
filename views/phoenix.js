@@ -4,8 +4,20 @@
   const idleImage = $('#phoenix-idle');
   let near = null, nearSince = 0, idleSeconds = 0, dwellTimer = null, blinkUntil = 0;
   let celebrationUntil = 0, celebrationTimer = null;
-  const style = () => state.features.companionStyle || 'phoenix';
-  const enabled = id => PhoenixStates.usesArtwork(style()) && !!poses.get(id) && feat(poses.get(id).key);
+  const style = () => PhoenixStates.effective(state.features);
+  const enabled = id => PhoenixStates.usesArtwork(style()) && !!poses.get(id) && PhoenixStates.has(id, style()) && feat(poses.get(id).key);
+  // where she looks: the pointer's offset from the island (dy grows downward), the nearest of her
+  // gazes she has, falling back toward the plain left / right and then straight ahead
+  function gaze(dx, dy) {
+    const ax = Math.abs(dx), side = dx < 0 ? 'left' : 'right';
+    const wants = [];
+    if (dy < -16 && ax < -dy) wants.push('idle-look-up');
+    else if (dy > 28 && ax < dy * 0.5) wants.push('idle-look-down');
+    else if (dy > 28 && ax < dy * 2) wants.push(`idle-look-down-${side}`, `idle-look-half-${side}`, `idle-look-${side}`);
+    else if (ax > 20 && ax < 90) wants.push(`idle-look-half-${side}`, `idle-look-${side}`);
+    else if (ax >= 90) wants.push(`idle-look-${side}`);
+    return wants.find(enabled) || null;
+  }
   function paint(image,id,characterStyle = style()) {
     const pose = poses.get(id);
     if (!pose) return;
@@ -22,8 +34,8 @@
     if (!lingered) return null;
     if (style() === 'zaher-standing') return enabled('idle') ? 'idle' : null;
     if (Date.now() < blinkUntil && enabled('idle-blink') && !state.features.noAnimations) return 'idle-blink';
-    if (near.dx < -20 && enabled('idle-look-left')) return 'idle-look-left';
-    if (near.dx > 20 && enabled('idle-look-right')) return 'idle-look-right';
+    const look = gaze(near.dx, near.dy || 0);
+    if (look) return look;
     return enabled('idle') ? 'idle' : null;
   }
   function drawIdle() {

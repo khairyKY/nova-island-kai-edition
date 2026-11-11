@@ -70,6 +70,7 @@ const DEFAULTS = {
   privacyDots: true,
   // companion
   companionStyle: 'phoenix',
+  zaherIdle: 'seated', // how Zaher waits beside the island (his other poses are the same either way)
   ...Object.fromEntries(PHOENIX_STATES.map(({key}) => [key,true])),
   netToasts: true,
   welcomeBack: true,
@@ -78,8 +79,7 @@ const DEFAULTS = {
   smartClipboard: true,
   novaEyes: true,
   novaPrayer: true, // Nova in her prayer cap at the adhan
-  adhanDuck: true, // other apps' sound down to 20 % while the adhan is on the island
-  prayerNudge: true, // a gentle reminder if you're still at the PC 10 min after the adhan
+  adhanAudio: 'pause', // the rest of the PC's sound at the adhan: 'pause' it, 'lower' it to 20 % while it shows, or 'leave' it
   novaFocus: true, // Nova with her headband at focus start / end
   water: true, // the Drop reminds you to drink
   waterEvery: 60, // minutes at the computer between glasses
@@ -118,7 +118,9 @@ const TEXTS = { focusApps: 200 };
 
 // settings that are one of a fixed list
 const CHOICES = {
-  companionStyle: ['phoenix', 'gazelle', 'zaher-seated', 'zaher-standing', 'classic', 'none'],
+  companionStyle: ['phoenix', 'gazelle', 'zaher', 'classic', 'none'],
+  zaherIdle: ['seated', 'standing'],
+  adhanAudio: ['pause', 'lower', 'leave'],
   kaiNoticeStyle: ['card', 'compact'],
   dustStyle: ['soft', 'thanos'],
   dustSpeed: ['slow', 'normal', 'fast'],
@@ -132,6 +134,8 @@ const SOLID_THEMES = ['kai-day', 'kai-fern-day', 'bakka', 'midnight', 'forest', 
 const saved = settings.load('features.json', {});
 // the second companion was renamed from Sherman to Zaher
 if (typeof saved?.companionStyle === 'string') saved.companionStyle = saved.companionStyle.replace(/^sherman-/, 'zaher-');
+// Zaher seated / standing became one Zaher, with seated or standing for his idle pose only
+if (/^zaher-(seated|standing)$/.test(saved?.companionStyle || '')) { saved.zaherIdle = saved.companionStyle.slice(6); saved.companionStyle = 'zaher'; }
 const newerSettings = Object.fromEntries(Object.entries(saved || {}).filter(([key]) => !Object.hasOwn(DEFAULTS, key)));
 let values = { ...DEFAULTS, ...pick(saved) };
 const listeners = [];

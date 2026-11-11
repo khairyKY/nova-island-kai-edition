@@ -133,11 +133,14 @@
         chime();
         // Nova in her prayer cap on the rug; the plain toast when she's off or there's no room
         const iftar = k === 'maghrib' && isRamadan(d) ? ' · تقبّل الله صيامك' : '';
-        // music, videos, everything else: down to 20 % while the adhan is on the island, back after
-        // (when it ends or is closed; the timer in case another scene takes its place)
-        const duck = feat('adhanDuck');
+        // the rest of the PC's sound (Settings > Prayer > At the adhan): paused (the default), or down
+        // to 20 % while the adhan is on the island and back after (when it ends or is closed; the
+        // timer in case another scene takes its place), or left alone
+        const audio = state.features.adhanAudio || 'pause';
+        const duck = audio === 'lower';
         let unducked = false;
         const unduck = () => { if (duck && !unducked) { unducked = true; bridge.mediaCmd('unduck'); } };
+        if (audio === 'pause') bridge.mediaCmd('pauseall');
         if (duck) bridge.mediaCmd('duck 0.2');
         const shown = (window.phoenix?.style() !== 'classic' || feat('novaPrayer')) && window.playScene?.({
           who: 'nova', phoenixPose:'prayer', props: ['cap', 'rug'], arms: 'fold', tone: 'gold', badge: '☾ الأذان', lang: 'ar',
@@ -151,33 +154,12 @@
           showToast('prayer', `حان الآن موعد صلاة ${NAMES[k]}`, clock(t), 0, 9000);
           setTimeout(() => island.classList.remove('prayer-alert'), 9200);
         }
-        watchPause(k);
       } else if (diff > 0 && diff <= SOON_MIN * 60000 && diff > (SOON_MIN - 1) * 60000 && !fired.has(`${id}-soon`)) {
         fired.add(`${id}-soon`);
         showToast('prayer-soon', `${NAMES[k]} بعد ${SOON_MIN} دقائق`, clock(t), 0, 5000);
       }
     }
   }
-
-  // A gentle nudge: still at the PC ten minutes after the adhan (no two-minute break from the keyboard
-  // and mouse in between, which is what praying looks like from here), the companion asks once
-  const NUDGE_MS = 10 * 60000, AWAY_S = 120;
-  let pauseWatch = null;
-  bridge.onMedia((m) => { if (pauseWatch && typeof m.idle === 'number' && m.idle >= AWAY_S) pauseWatch.paused = true; });
-  function watchPause(k) {
-    if (!feat('prayerNudge')) return;
-    const w = pauseWatch = { paused: false };
-    setTimeout(() => {
-      if (pauseWatch !== w || w.paused) return;
-      pauseWatch = null;
-      const shown = window.playScene?.({
-        who: 'nova', phoenixPose: 'prayer', tone: 'gold', badge: '☾ تذكير', lang: 'ar',
-        title: `هل صليت ${NAMES[k]}؟`, sub: 'مرّت عشر دقائق على الأذان', ms: 12000,
-      });
-      if (!shown) showToast('prayer', `هل صليت ${NAMES[k]}؟`, '', 0, 8000);
-    }, NUDGE_MS);
-  }
-  window.previewPrayerNudge = () => window.playScene?.({ who: 'nova', phoenixPose: 'prayer', tone: 'gold', badge: '☾ تذكير', lang: 'ar', title: `هل صليت ${NAMES.asr}؟`, sub: 'مرّت عشر دقائق على الأذان (معاينة)', ms: 8000 });
 
   // Ramadan: until maghrib count down to iftar, after it to the next imsak
   function ramadan(d, now) {

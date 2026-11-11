@@ -24,6 +24,7 @@
     const claude = notice.kind.startsWith('claude_');
     toast.dataset.source = (claude ? 'Claude · ' : 'Kai’s Flow · ') + (labels[notice.kind] || 'Notification');
     const duration = (state.features.kaiNoticeSeconds || 8) * 1000;
+    toast.style.setProperty('--kai-dur', `${duration}ms`); // the line along the bottom runs down with it
     showToast('kai-flow', notice.title, notice.body, 0, duration, claude ? null : () => bridge.apps.launch('com.kaisflow.garden'));
   }
   window.previewKaiNotice = (notice) => { queue.push(notice); next(); }; // Settings > Animations preview
