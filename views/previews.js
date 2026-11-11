@@ -57,6 +57,7 @@
       who: 'nova', phoenixPose: 'prayer', props: ['cap', 'rug'], arms: 'fold', tone: 'gold', badge: '☾ الأذان', lang: 'ar',
       title: 'أَقِمْ صَلَاتَكَ', quran: true, sub: 'حان الآن وقت صلاة <b>المغرب</b> (معاينة)', ms: 9000,
     }),
+    'prayer-nudge': () => window.previewPrayerNudge?.(),
     water: () => window.playScene?.({
       who: 'drop', phoenixPose: 'water-reminder', props: ['glass'], arms: 'hold', tone: 'water', badge: '💧 Water',
       title: 'Drink a glass of water', sub: '<b>3</b> of 8 glasses today (preview)', ms: 8000,

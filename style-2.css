@@ -382,3 +382,15 @@ body.no-anim .pd-pill { animation: none; }
   background: linear-gradient(100deg, transparent 30%, rgba(200, 225, 255, .5) 50%, transparent 70%) -120% 0 / 60% 100% no-repeat;
   animation: fx-sweep .8s cubic-bezier(.4, 0, .2, 1) .2s both; }
 .l-toast.battery :is(#t-label, #t-value) { animation: fx-drop-in .5s cubic-bezier(.3, 1.5, .5, 1) .05s both; }
+
+/* the next prayer's time-left ring around the moon (views/prayer.js): it fills as the time between
+   the last prayer and the next runs out, and glows gold and breathes in the last 15 minutes */
+.i-pr-ring { position: relative; flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; }
+.i-pr-ring .pr-arc { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); fill: none; stroke-width: 2; overflow: visible; }
+.i-pr-ring .pr-trk { stroke: currentColor; opacity: .16; }
+.i-pr-ring .pr-val { stroke: currentColor; opacity: .75; stroke-dasharray: 100; stroke-dashoffset: calc(100 - var(--pr-pct, 0)); stroke-linecap: round; transition: stroke-dashoffset 1s ease-out; }
+.i-pr-ring .i-moon { width: 11px; height: 11px; }
+.i-pr-ring.soon { color: #f0b232; }
+.i-pr-ring.soon .pr-val { opacity: 1; filter: drop-shadow(0 0 2px rgba(240, 178, 50, .85)); animation: pr-breathe 2.4s ease-in-out infinite; }
+@keyframes pr-breathe { 50% { filter: drop-shadow(0 0 4px rgba(240, 178, 50, 1)); opacity: .7; } }
+body.no-anim .i-pr-ring.soon .pr-val { animation: none; }

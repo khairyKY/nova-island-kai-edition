@@ -684,6 +684,9 @@ static class Program {
     Match m;
     if (cmd.StartsWith("focusapp	") || cmd.StartsWith("runningapps	")) { AppCommand(cmd); return; }
     // Battery saver now (Saver.cs)
+    // the adhan: other apps' sound down while it's on the island (Duck.cs)
+    if (cmd.StartsWith("duck ")) { float share; if (float.TryParse(cmd.Substring(5), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out share)) Duck.Down(share); return; }
+    if (cmd == "unduck") { Duck.Up(); return; }
     if (cmd == "fxget") { outw.WriteLine(Saver.Get()); return; }
     if (cmd.StartsWith("hz ")) { int hz; if (int.TryParse(cmd.Substring(3), out hz)) Saver.Hz(hz); return; }
     if (cmd.StartsWith("anim ")) { Saver.Anim(cmd.EndsWith("1")); return; }

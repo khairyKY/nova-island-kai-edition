@@ -77,6 +77,8 @@ const DEFAULTS = {
   smartClipboard: true,
   novaEyes: true,
   novaPrayer: true, // Nova in her prayer cap at the adhan
+  adhanDuck: true, // other apps' sound down to 20 % while the adhan is on the island
+  prayerNudge: true, // a gentle reminder if you're still at the PC 10 min after the adhan
   novaFocus: true, // Nova with her headband at focus start / end
   water: true, // the Drop reminds you to drink
   waterEvery: 60, // minutes at the computer between glasses

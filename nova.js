@@ -575,6 +575,8 @@ function startMedia() {
     syncAudioMeter();
     // Windows' own notifications, mirrored onto the island (the helper polls the notification list)
     mediaWrite(features.get().appNotices !== false ? 'appnotify on' : 'appnotify off');
+    // apps' volumes left down by an adhan the island quit during: back up (nothing if none)
+    mediaWrite('unduck');
   });
   let buffer = '';
   media.on('error', (err) => {
@@ -738,7 +740,7 @@ async function shotToShelf(until = 0) {
 }
 ipcMain.on('shot-to-shelf', () => shotToShelf());
 
-const MEDIA_CMD = /^(toggle|next|prev|mute|seek \d+(\.\d+)?|vol [01](\.\d+)?|bright \d{1,3})$/;
+const MEDIA_CMD = /^(toggle|next|prev|mute|seek \d+(\.\d+)?|vol [01](\.\d+)?|bright \d{1,3}|duck 0(\.\d+)?|unduck)$/;
 ipcMain.on('media-cmd', (_e, cmd) => {
   if (media && typeof cmd === 'string' && MEDIA_CMD.test(cmd)) media.stdin.write(cmd + '\n');
 });
