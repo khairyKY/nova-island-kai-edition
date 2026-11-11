@@ -1,6 +1,6 @@
 {
   "name": "nova-island",
-  "version": "1.7.15",
+  "version": "1.7.16",
   "description": "A living island for your Windows desktop",
   "main": "nova.js",
   "scripts": {

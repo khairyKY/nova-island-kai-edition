@@ -29,6 +29,24 @@
   function place(el, cx, cy, w, h) {
     Object.assign(el.style, { width: `${w}px`, height: `${h}px`, borderRadius: `${h / 2}px`, left: `${cx - w / 2}px`, top: `${cy - h / 2}px` });
   }
+  // the island can open or close under a drop: the drop hangs from wherever its edge is right now,
+  // and the goo's copy of the island takes its current shape
+  function follow(a) {
+    const r = island.getBoundingClientRect();
+    a.cx = r.left + r.width / 2;
+    a.edge = r.bottom;
+    if (!goo.hidden) Object.assign(body.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, borderRadius: getComputedStyle($('.clip')).borderRadius });
+  }
+  // while it floats (bob on CSS) the pill is moved along with the island's edge; it's one rect read
+  // a frame, and only touches the pill when the edge actually moved
+  function floatFollow() {
+    const a = anim;
+    if (!a || a.phase !== 'float') return;
+    const cx = a.cx, edge = a.edge;
+    follow(a);
+    if (cx !== a.cx || edge !== a.edge) place(pill, a.cx, a.edge + HANG, a.w, 2 * R + 2);
+    requestAnimationFrame(floatFollow);
+  }
 
   // how long the open notice floats, then the way home (restarted when a new notice joins it)
   function hold(a) {
@@ -39,6 +57,7 @@
     a.timer2 = setTimeout(() => {
       // where the float has the pill right now (as drawn), so the way back starts there without a jump
       const rc = pill.getBoundingClientRect();
+      follow(a);
       a.offset = rc.top + rc.height / 2 - (a.edge + HANG);
       pill.hidden = true;
       goo.hidden = false;
@@ -62,18 +81,17 @@
       return;
     }
     if (anim) { queue.push(notice); return; }
-    const r = island.getBoundingClientRect();
     const fill = surface();
     body.style.background = bead.style.background = pill.style.background = fill;
-    Object.assign(body.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, borderRadius: getComputedStyle($('.clip')).borderRadius });
     text.textContent = notice.title;
     text.style.opacity = 0;
     pill.hidden = true;
     goo.hidden = false;
     wrap.hidden = false;
     const w = Math.max(96, measure.measureText(notice.title).width + 52);
-    anim = { phase: 'out', start: performance.now(), cx: r.left + r.width / 2, edge: r.bottom, w };
-    place(bead, anim.cx, r.bottom - 10, 2 * R * 0.35, 2 * R * 0.35); // not where the last drop left it
+    anim = { phase: 'out', start: performance.now(), w };
+    follow(anim);
+    place(bead, anim.cx, anim.edge - 10, 2 * R * 0.35, 2 * R * 0.35); // not where the last drop left it
     requestAnimationFrame(tick);
   }
 
@@ -82,6 +100,7 @@
   function tick(now) {
     const a = anim;
     if (!a) return;
+    follow(a);
     const ms = state.features.noAnimations ? 1e6 : now - a.start;
     const hang = a.edge + HANG;
     if (a.phase === 'out') {
@@ -99,6 +118,7 @@
       requestAnimationFrame(() => { text.style.opacity = 1; });
       a.phase = 'float';
       hold(a);
+      requestAnimationFrame(floatFollow);
       return;
     }
     if (a.phase === 'back') {
