@@ -176,8 +176,12 @@
     const keep = Math.max(1, Math.ceil(pts.length / 6000));
     return { pts: keep === 1 ? pts : pts.filter((_, i) => i % keep === 0), box };
   }
+  const enabled = () => state.features.softDust !== false && !state.features.noAnimations && !reduced.matches && !low();
   window.songDust = {
-    can: () => state.features.softDust !== false && !state.features.noAnimations && !reduced.matches && !low() && !anim && songEls().length > 0,
+    enabled,
+    can: () => enabled() && !anim && songEls().length > 0,
+    // a new song: the pictures of the places it shows in are of the old one
+    forget: () => { for (const k of [...snaps.keys()]) if (k === 'compact' || k === 'peek' || k === 'expanded:media') snaps.delete(k); },
     // the old song as it's shown right now (before the new one is put in)
     from: () => songGrains(songEls()),
     // call with the new song already in place and hidden (the 'song-dusting' class)

@@ -18,7 +18,7 @@ const DEFAULTS = {
   // live activities
   mediaPill: true,
   mediaTitle: true,
-  trackPeek: true,
+  songChange: 'pill', // a new song: 'pill' turns the pill's title to dust and back, 'card' does it in the Now Playing card
   // notifications
   kbdToast: true,
   capsToast: true,
@@ -113,6 +113,7 @@ const CHOICES = {
   kaiNoticeStyle: ['card', 'compact'],
   dustStyle: ['soft', 'thanos'],
   dustSpeed: ['slow', 'normal', 'fast'],
+  songChange: ['pill', 'card'],
   graphics: ['low', 'medium', 'high', 'veryHigh'],
   theme: ['kai-day', 'kai-night', 'kai-fern-day', 'kai-fern-night', 'original', 'bakka', 'outline', 'midnight', 'forest', 'snow', 'cat', 'galaxy', 'aurora', 'ocean', 'nody', 'lava', 'retro'],
 };

@@ -110,6 +110,11 @@ function showFeatures(f) {
   $$('[data-kai-style]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.kaiStyle === f.kaiNoticeStyle)));
   const dust = f.softDust === false ? 'off' : f.dustStyle || 'soft';
   $$('[data-dust]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.dust === dust)));
+  const sc = f.songChange || 'pill';
+  $$('[data-song-change]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.songChange === sc)));
+  $('#song-change-note').textContent = sc === 'card'
+    ? 'The pill grows into the Now Playing card and the old song turns to dust and reforms as the new one'
+    : "The pill's title turns to dust and reforms as the new song's";
   const g = f.graphics || 'veryHigh';
   $$('[data-graphics]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.graphics === g)));
   $('#graphics-note').textContent = GRAPHICS_NOTE[g];
@@ -131,11 +136,15 @@ function showFeatures(f) {
   showSteppers();
 }
 const GRAPHICS_NOTE = {
-  low: 'About 230 MB. Drawn on the CPU: the least memory, animations around 85 fps',
+  low: 'About 205 MB. Drawn on the CPU, no dust effect: the least memory, animations around 85 fps',
   medium: 'About 270 MB. Nearly as smooth; the Pady drop is a little less fluid',
   high: 'About 370 MB. Smooth, a little less memory than Very high',
   veryHigh: 'About 400 MB. Drawn on the GPU: the smoothest, 120 fps',
 };
+$$('[data-song-change]').forEach((b) => b.addEventListener('click', () => {
+  api.setFeatures({ songChange: b.dataset.songChange });
+  saved();
+}));
 $$('[data-graphics]').forEach((b) => b.addEventListener('click', () => {
   if (b.getAttribute('aria-checked') === 'true') return;
   // the island restarts to apply it

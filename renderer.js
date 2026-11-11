@@ -781,11 +781,14 @@ function putInSong(thumb) {
   render(); // the pill's title
 }
 // The old song turns to soft dust and reforms as the new one (views/soft-dust.js); with the dust
-// off it slides out and the new one slides in instead.
-function startSongSwap(key) {
+// off it slides out and the new one slides in instead. card: Settings > Song change > Card, the pill
+// grows into the Now Playing card first (still the old song) and the change happens in there.
+const CARD_SETTLE = 420; // the card's grow, before its dust
+const CARD_MS = 4200;    // how long the card stays: its grow, the dust, then ~3 s of the new song
+function startSongSwap(key, card) {
   const s = swap = { key, thumb: '', at: performance.now() };
-  const dust = !!window.songDust?.can();
-  if (!dust) {
+  const dust = !!window.songDust?.enabled();
+  if (!dust && !card) {
     for (const sel of [...SONG_ART, ...SONG_TEXT]) {
       const el = $(sel);
       el.getAnimations().forEach((a) => a.cancel());
@@ -794,8 +797,9 @@ function startSongSwap(key) {
   }
   const bringIn = async () => {
     if (swap !== s) return; // another song came first: its swap carries on from here
-    if (!s.thumb && performance.now() - s.at < SWAP_WAIT) { setTimeout(bringIn, 40); return; }
-    if (dust) {
+    const waited = performance.now() - s.at;
+    if ((!s.thumb && waited < SWAP_WAIT) || (card && waited < CARD_SETTLE)) { setTimeout(bringIn, 40); return; }
+    if (dust && window.songDust.can()) {
       // the new artwork decoded first, so it goes into the dust and onto the island in one go
       let art = null;
       if (s.thumb) {
@@ -813,6 +817,7 @@ function startSongSwap(key) {
     }
     swap = null;
     putInSong(s.thumb);
+    if (dust || card) return; // nothing to dust (or no dust in the card): just the new song
     SONG_ART.concat(SONG_TEXT).forEach((sel, i) => {
       const el = $(sel);
       el.getAnimations().forEach((a) => a.cancel());
@@ -952,14 +957,19 @@ bridge.onMedia((m) => {
   const trackChanged = key !== lastTrack;
   const sourceChanged = m.source?.id !== previous.source?.id || m.source?.name !== previous.source?.name;
   if (key !== lastTrack) {
+    window.songDust?.forget(); // the dust's pictures of the pill, card and panel show the old song
     const songToSong = key && lastTrack && m.title && !state.mediaFront;
-    // a song following a song where it's showing (the pill with its title, or the open panel):
-    // the two swap in place; otherwise the new track card
-    if (songToSong && !state.features.noAnimations && ((compactKind() === 'media' && feat('mediaTitle')) || lastMode === 'expanded')) {
-      startSongSwap(key);
-    } else if (songToSong && feat('trackPeek')) {
-      state.peekUntil = Date.now() + 3200;
-      setTimeout(render, 3300);
+    // Settings > Song change: 'card' grows the pill into the Now Playing card and changes the song
+    // in there; 'pill' changes it in place. The open panel changes in place either way.
+    const card = songToSong && state.features.songChange === 'card' && lastMode !== 'expanded';
+    if (card) {
+      state.peekUntil = Date.now() + CARD_MS;
+      setTimeout(render, CARD_MS + 100);
+    }
+    const inPlace = (compactKind() === 'media' && feat('mediaTitle')) || lastMode === 'expanded';
+    // (the card without the dust just shows the new song)
+    if (songToSong && !state.features.noAnimations && (card ? !!window.songDust?.enabled() : inPlace)) {
+      startSongSwap(key, card);
     }
     lastTrack = key;
     hasArtwork = false;

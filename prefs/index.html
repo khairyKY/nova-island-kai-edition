@@ -157,7 +157,12 @@
           <div class="card">
             <label class="row"><b>Show media</b><input type="checkbox" class="sw" data-feature="mediaPill"></label>
             <label class="row sub" data-needs="mediaPill"><b>Title</b><input type="checkbox" class="sw" data-feature="mediaTitle"></label>
-            <label class="row"><b>New track card</b><input type="checkbox" class="sw" data-feature="trackPeek"></label>
+            <div class="row"><div class="txt"><b>Song change</b><small id="song-change-note"></small></div>
+              <div class="seg" role="radiogroup" aria-label="Song change">
+                <button role="radio" data-song-change="pill">Pill</button>
+                <button role="radio" data-song-change="card">Card</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="group">
