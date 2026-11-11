@@ -3,7 +3,7 @@ const {
 } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 
 // Kai Edition keeps its own data folder, so it never shares settings or the single-instance lock
 // with the original Nova Island on the same PC. The first run copies the original's folder
@@ -884,6 +884,32 @@ function updateProtection() {
   }
 }
 
+// --- the battery saver switched by hand (Settings, the tray, Ctrl+Alt+B = Pady's 4-finger hold) ---
+// The island's saver below, plus Windows' own Battery saver. Windows has no switch for that one:
+// raising the level it turns on at to 100 % turns it on now while unplugged (it never runs on the
+// charger), and the user's own level is put back when it's switched off.
+const ENERGY_SAVER = ['SCHEME_CURRENT', 'de830923-a562-41af-a086-e3a2c6bad2da', 'e69653ca-cf7f-4f05-aa73-cb833fa90ad4'];
+const powercfg = (args) => new Promise((res) => execFile('powercfg', args, { windowsHide: true }, (err, out) => res(err ? null : String(out))));
+async function windowsSaver(on) {
+  if (on) {
+    // the level the user had, read before it's raised (the last value is the on-battery one)
+    const values = (await powercfg(['/qh', ...ENERGY_SAVER]))?.match(/0x[0-9a-f]{8}/gi) || [];
+    const level = values.length ? parseInt(values.at(-1), 16) : -1;
+    if (level >= 0 && level < 100) settings.save('saver-level.json', { level });
+  }
+  const level = on ? 100 : settings.load('saver-level.json', { level: 20 }).level;
+  if ((await powercfg(['/setdcvalueindex', ...ENERGY_SAVER, String(level)])) === null) return log.info('windows battery saver: powercfg failed');
+  await powercfg(['/setactive', 'SCHEME_CURRENT']);
+  log.info(`windows battery saver ${on ? 'on' : 'off'} (turns on at ${level} %)`);
+}
+const toggleSaver = () => features.set({ saverNow: !features.get().saverNow });
+let saverNow = features.get().saverNow;
+features.onChange((f) => {
+  if (f.saverNow === saverNow) return;
+  saverNow = f.saverNow;
+  windowsSaver(saverNow);
+});
+
 // --- performance options and the battery saver ---
 // The user's own switches (Remove blur, Remove animations, Freeze glass) slow the cursor poll,
 // the CPU/RAM poll and the screen capture. The battery saver turns all three on while on battery
@@ -930,7 +956,8 @@ function applyPerf() {
 function evalSaver() {
   const f = features.get();
   let on = saverOn;
-  if (!f.batterySaver || battery.pct < 0 || battery.ac) on = false;
+  if (f.saverNow) on = true; // switched on by hand: on until switched off, battery or not
+  else if (!f.batterySaver || battery.pct < 0 || battery.ac) on = false;
   else if (battery.pct <= f.batterySaverAt) on = true;
   else if (battery.pct >= f.batterySaverAt + 10) on = false;
   if (on === saverOn) return;
@@ -1271,6 +1298,7 @@ function appMenu() {
       click: (item) => { setStartWithWindows(item.checked); notifyGeneral(); },
     }]),
     { label: 'Expand / collapse   Ctrl+Alt+I', click: () => send('toggle') },
+    { label: 'Battery saver   Ctrl+Alt+B', type: 'checkbox', checked: features.get().saverNow, click: toggleSaver },
     { label: 'Settings…', click: () => prefsWindow.open() },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
@@ -1618,6 +1646,8 @@ app.whenReady().then(() => {
     }
     send('toggle');
   });
+  // battery saver on / off (Pady's 4-finger hold presses this)
+  if (!globalShortcut.register('CommandOrControl+Alt+B', toggleSaver)) log.info('Ctrl+Alt+B is taken by another app');
   screen.on('display-metrics-changed', refreshPlacement);
   screen.on('display-added', refreshPlacement);
   screen.on('display-removed', refreshPlacement);
