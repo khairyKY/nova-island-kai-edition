@@ -908,6 +908,9 @@ features.onChange((f) => {
   if (f.saverNow === saverNow) return;
   saverNow = f.saverNow;
   windowsSaver(saverNow);
+  // switched by hand: always say so, even when the island's saver was already on (battery low);
+  // switched off while the battery is low, the automatic saver keeps it on, and says why
+  if (!evalSaver()) send('saver', { on: saverOn, pct: battery.pct, stays: !saverNow && saverOn, at: f.batterySaverAt });
 });
 
 // --- performance options and the battery saver ---
@@ -960,12 +963,13 @@ function evalSaver() {
   else if (!f.batterySaver || battery.pct < 0 || battery.ac) on = false;
   else if (battery.pct <= f.batterySaverAt) on = true;
   else if (battery.pct >= f.batterySaverAt + 10) on = false;
-  if (on === saverOn) return;
+  if (on === saverOn) return false;
   saverOn = on;
   log.info(`battery saver ${on ? 'on' : 'off'} (${battery.pct}%)`);
   send('saver', { on, pct: battery.pct });
   applyPerf();
   notifyGeneral();
+  return true;
 }
 function onBattery(pct, ac) {
   if (pct === battery.pct && ac === battery.ac) return;

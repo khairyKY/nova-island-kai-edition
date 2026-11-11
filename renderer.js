@@ -1456,7 +1456,9 @@ function applyFeatures(f) {
 bridge.onFeatures(applyFeatures);
 // a screen recorder is running (NVIDIA Instant Replay, OBS): a glass theme turns solid until it's gone
 bridge.onRecording((on) => document.body.classList.toggle('th-rec', !!on));
-bridge.onSaver((s) => showToast('saver', s.on ? 'Battery saver is on' : 'Battery saver is off', s.pct >= 0 ? `${s.pct}%` : '', 0, 3500));
+bridge.onSaver((s) => showToast('saver',
+  s.stays ? 'Battery saver stays on' : s.on ? 'Battery saver is on' : 'Battery saver is off',
+  s.stays ? `${s.pct}% · below ${s.at}%` : s.pct >= 0 ? `${s.pct}%` : '', 0, 3500));
 bridge.onVisibility((v) => {
   state.visible = !!v;
   syncProgress();
