@@ -212,6 +212,9 @@
     else stop();
   }
 
+  // hidden (a fullscreen app): no frames come, so don't leave a half-done dust to flash on return
+  bridge.onVisibility((v) => { if (!v) stop(); });
+
   // anything clicked in the open panel (another tab, a button) changes it: a fresh picture shortly after
   island.addEventListener('click', () => { if (lastMode === 'expanded') scheduleSnap('expanded'); });
 

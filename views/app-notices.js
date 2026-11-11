@@ -71,7 +71,12 @@
   bridge.onAppNotice((notice) => {
     if (state.features.appNotices === false) return;
     // Pady's quick notices never wait behind another: the drop hangs below the island
-    if (notice.app === 'pady') { if (state.features.padyDrops !== false && state.visible && window.padyDrop) window.padyDrop(notice); return; }
+    if (notice.app === 'pady') {
+      // a hint about the gesture that opens the island says nothing the island opening doesn't
+      if (/ctrl\+alt\+i/i.test(notice.title)) return;
+      if (state.features.padyDrops !== false && state.visible && window.padyDrop) window.padyDrop(notice);
+      return;
+    }
     const mirrored = !!notice.aumid && !KNOWN[notice.app];
     // Kai's Flow's own notices come through its own channel (with its card) while that's on
     if (mirrored && notice.aumid === KAIS_FLOW && state.features.kaiNotifications) return;
