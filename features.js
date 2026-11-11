@@ -111,7 +111,7 @@ const RANGES = {
 
 // settings that are one of a fixed list
 const CHOICES = {
-  companionStyle: ['phoenix', 'zaher-seated', 'zaher-standing', 'classic', 'none'],
+  companionStyle: ['phoenix', 'gazelle', 'zaher-seated', 'zaher-standing', 'classic', 'none'],
   kaiNoticeStyle: ['card', 'compact'],
   dustStyle: ['soft', 'thanos'],
   dustSpeed: ['slow', 'normal', 'fast'],

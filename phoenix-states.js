@@ -16,8 +16,9 @@
     ['resting','phoenixResting','Resting','While you are away and during eye-rest reminders'],
   ].map(([id,key,label,hint]) => ({id,key,label,hint,src:`assets/phoenix-v1/ui/${id}.png`}));
   states.isZaher = style => style === 'zaher-seated' || style === 'zaher-standing';
-  states.usesArtwork = style => style === 'phoenix' || states.isZaher(style);
+  states.usesArtwork = style => style === 'phoenix' || style === 'gazelle' || states.isZaher(style);
   states.sourceFor = (pose, style) => {
+    if (style === 'gazelle') return `assets/gazelle-v1/ui/${pose.id}.png`;
     if (!states.isZaher(style)) return pose.src;
     const file = pose.id === 'idle' && style === 'zaher-standing' ? 'idle-standing' : pose.id;
     return `assets/zaher-v1/ui/${file}.png`;

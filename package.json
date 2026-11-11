@@ -54,7 +54,9 @@
       "!assets/phoenix-v1/*.png",
       "!assets/phoenix-v1/generation.json",
       "!assets/zaher-v1/*.png",
-      "!assets/zaher-v1/generation.json"
+      "!assets/zaher-v1/generation.json",
+      "!assets/*-v1/*.png",
+      "!assets/*-v1/generation.json"
     ],
     "publish": {
       "provider": "github",
@@ -66,7 +68,10 @@
       "helper/browser-media-host.exe"
     ],
     "extraResources": [
-      { "from": "local-plugins/kais-flow.nvp", "to": "bundled-plugins/kais-flow.nvp" }
+      {
+        "from": "local-plugins/kais-flow.nvp",
+        "to": "bundled-plugins/kais-flow.nvp"
+      }
     ],
     "win": {
       "target": [
