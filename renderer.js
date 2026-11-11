@@ -785,7 +785,7 @@ function putInSong(thumb) {
 // grows into the Now Playing card first (still the old song) and the change happens in there.
 const CARD_SETTLE = 420; // the card's grow, before its dust
 const CARD_MS = 4200;    // how long the card stays: its grow, the dust, then ~3 s of the new song
-function startSongSwap(key, card) {
+function startSongSwap(key, card, cardUp = false) {
   const s = swap = { key, thumb: '', at: performance.now() };
   const dust = !!window.songDust?.enabled();
   if (!dust && !card) {
@@ -798,7 +798,7 @@ function startSongSwap(key, card) {
   const bringIn = async () => {
     if (swap !== s) return; // another song came first: its swap carries on from here
     const waited = performance.now() - s.at;
-    if ((!s.thumb && waited < SWAP_WAIT) || (card && waited < CARD_SETTLE)) { setTimeout(bringIn, 40); return; }
+    if ((!s.thumb && waited < SWAP_WAIT) || (card && !cardUp && waited < CARD_SETTLE)) { setTimeout(bringIn, 40); return; }
     if (dust && window.songDust.can()) {
       // the new artwork decoded first, so it goes into the dust and onto the island in one go
       let art = null;
@@ -962,6 +962,7 @@ bridge.onMedia((m) => {
     // Settings > Song change: 'card' grows the pill into the Now Playing card and changes the song
     // in there; 'pill' changes it in place. The open panel changes in place either way.
     const card = songToSong && state.features.songChange === 'card' && lastMode !== 'expanded';
+    const cardUp = lastMode === 'peek'; // already showing (a skip from the island): no grow to wait for
     if (card) {
       state.peekUntil = Date.now() + CARD_MS;
       setTimeout(render, CARD_MS + 100);
@@ -969,7 +970,7 @@ bridge.onMedia((m) => {
     const inPlace = (compactKind() === 'media' && feat('mediaTitle')) || lastMode === 'expanded';
     // (the card without the dust just shows the new song)
     if (songToSong && !state.features.noAnimations && (card ? !!window.songDust?.enabled() : inPlace)) {
-      startSongSwap(key, card);
+      startSongSwap(key, card, cardUp);
     }
     lastTrack = key;
     hasArtwork = false;
@@ -1052,6 +1053,12 @@ $$('[data-cmd]').forEach((btn) =>
   btn.addEventListener('click', () => {
     const cmd = btn.dataset.cmd;
     bridge.mediaCmd(cmd);
+    // Song change > Card: a skip goes to the card right away (still this song; the player takes a
+    // moment), so leaving the island shows the card and the new song dusts in there, not the pill
+    if ((cmd === 'next' || cmd === 'prev') && state.features.songChange === 'card' && state.media.has && !state.mediaFront) {
+      state.peekUntil = Date.now() + CARD_MS + 2000;
+      setTimeout(render, CARD_MS + 2100);
+    }
     if (cmd === 'toggle' && state.media.has) {
       // optimistic UI; hold it until the player reports the new state (it lags ~0.5 s),
       // otherwise the island morphs back and forth for a moment

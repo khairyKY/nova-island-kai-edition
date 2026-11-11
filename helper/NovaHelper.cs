@@ -519,7 +519,11 @@ static class Program {
   // timeline events come in bursts (seek, track change): coalesce them into one status line
   static int timelinePending;
   static readonly Timer timelineTimer = new Timer(state => { Interlocked.Exchange(ref timelinePending, 0); QueueMedia(); });
+  // Spotify announces a new song's title late (or not at all) but resets its timeline at once:
+  // a timeline change re-reads the song, and a skip polls it fast for a few seconds
+  static DateTime fastMetaUntil;
   static void TimelineChanged(GlobalSystemMediaTransportControlsSession sender, TimelinePropertiesChangedEventArgs args) {
+    Interlocked.Exchange(ref metadataDirty, 1);
     if (Interlocked.Exchange(ref timelinePending, 1) == 0) timelineTimer.Change(60, Timeout.Infinite);
   }
   // Which session the island shows (upstream 1.8.3): a playing one wins (latest to start, else
@@ -702,9 +706,12 @@ static class Program {
     var s = shown; // controls act on the session the island shows
     if (s == null) return;
     if ((m = Seek.Match(cmd)).Success) { Await(s.TryChangePlaybackPositionAsync((long)(Num(m.Groups[1].Value) * 10000000))); return; }
-    if (cmd == "toggle") Await(s.TryTogglePlayPauseAsync());
-    else if (cmd == "next") Await(s.TrySkipNextAsync());
-    else if (cmd == "prev") Await(s.TrySkipPreviousAsync());
+    // sent, not waited on: Spotify confirms a skip seconds late (or never), and waiting held up
+    // every status line until then; its own change events report the new state as soon as it lands
+    if (cmd == "toggle") s.TryTogglePlayPauseAsync();
+    else if (cmd == "next") s.TrySkipNextAsync();
+    else if (cmd == "prev") s.TrySkipPreviousAsync();
+    if (cmd == "next" || cmd == "prev") { fastMetaUntil = DateTime.UtcNow.AddSeconds(3); Interlocked.Exchange(ref metadataDirty, 1); }
   }
 
   static string JsonStr(string s) {
@@ -802,7 +809,8 @@ static class Program {
         acted = true;
       }
       if (!acted && DateTime.UtcNow < next) continue;
-      next = DateTime.UtcNow.AddMilliseconds(500);
+      bool fast = DateTime.UtcNow < fastMetaUntil;
+      next = DateTime.UtcNow.AddMilliseconds(fast ? 150 : 500);
 
       var o = new Json();
       var s = Pick();
@@ -832,7 +840,7 @@ static class Program {
         if (Interlocked.Exchange(ref metadataDirty, 0) != 0 || DateTime.UtcNow >= nextMetadata) {
           var updated = Await(s.TryGetMediaPropertiesAsync(), 800);
           if (updated != null) props = updated;
-          nextMetadata = DateTime.UtcNow.AddSeconds(updated != null && thumbOk ? 5 : 1);
+          nextMetadata = DateTime.UtcNow.AddMilliseconds(fast ? 150 : updated != null && thumbOk ? 1000 : 500);
         }
         var info = s.GetPlaybackInfo();
         var tl = s.GetTimelineProperties();
