@@ -45,6 +45,7 @@ const DEFAULTS = {
   softDust: true, // opening and closing: the content turns to dust and reforms (views/soft-dust.js)
   dustStyle: 'soft', // 'soft' drifts into the new layout; 'thanos' disintegrates and blows back in
   dustSpeed: 'normal', // slow / normal / fast
+  padyDrops: true, // Pady's notices as a drop under the island (off: none at all)
   appNotices: true, // other apps' notices on the island (Claude Code, through its hooks)
   // performance (the battery saver turns all three on while the battery is low)
   noBlur: false, // solid island, no screen capture at all

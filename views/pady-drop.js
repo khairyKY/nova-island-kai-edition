@@ -30,7 +30,37 @@
     Object.assign(el.style, { width: `${w}px`, height: `${h}px`, borderRadius: `${h / 2}px`, left: `${cx - w / 2}px`, top: `${cy - h / 2}px` });
   }
 
+  // how long the open notice floats, then the way home (restarted when a new notice joins it)
+  function hold(a) {
+    clearTimeout(a.timer); clearTimeout(a.timer2);
+    const ms = state.features.noAnimations ? 900 : HOLD_MS;
+    // the text fades out first, then the pill hands back to the goo for the way home
+    a.timer = setTimeout(() => { text.style.opacity = 0; }, ms - 160);
+    a.timer2 = setTimeout(() => {
+      // where the float has the pill right now (as drawn), so the way back starts there without a jump
+      const rc = pill.getBoundingClientRect();
+      a.offset = rc.top + rc.height / 2 - (a.edge + HANG);
+      pill.hidden = true;
+      goo.hidden = false;
+      a.phase = 'back';
+      a.start = performance.now();
+      requestAnimationFrame(tick);
+    }, ms);
+  }
+
   function play(notice) {
+    // a notice while a drop is out joins it (copy, then paste): new text, and the float starts over;
+    // only once the drop is on its way home does the next one wait for its own
+    if (anim && anim.phase !== 'back') {
+      text.textContent = notice.title;
+      anim.w = Math.max(96, measure.measureText(notice.title).width + 52);
+      if (anim.phase === 'float') {
+        place(pill, anim.cx, anim.edge + HANG, anim.w, 2 * R + 2);
+        text.style.opacity = 1;
+        hold(anim);
+      }
+      return;
+    }
     if (anim) { queue.push(notice); return; }
     const r = island.getBoundingClientRect();
     const fill = surface();
@@ -68,18 +98,7 @@
       goo.hidden = true;
       requestAnimationFrame(() => { text.style.opacity = 1; });
       a.phase = 'float';
-      // the text fades out first, then the pill hands back to the goo for the way home
-      a.timer = setTimeout(() => { text.style.opacity = 0; }, (state.features.noAnimations ? 900 : HOLD_MS) - 160);
-      a.timer2 = setTimeout(() => {
-        // where the float has the pill right now (as drawn), so the way back starts there without a jump
-        const rc = pill.getBoundingClientRect();
-        a.offset = rc.top + rc.height / 2 - (a.edge + HANG);
-        pill.hidden = true;
-        goo.hidden = false;
-        a.phase = 'back';
-        a.start = performance.now();
-        requestAnimationFrame(tick);
-      }, state.features.noAnimations ? 900 : HOLD_MS);
+      hold(a);
       return;
     }
     if (a.phase === 'back') {
