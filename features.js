@@ -51,6 +51,7 @@ const DEFAULTS = {
   noBlur: false, // solid island, no screen capture at all
   noAnimations: false,
   glassFreeze: true, // refresh the glass on opening and moving, not while it sits closed
+  graphics: 'veryHigh', // how it's drawn, memory against smoothness (nova.js, applied on a restart)
   batterySaver: false,
   batterySaverAt: 20, // percent
   news: true, // plugins, updates and news from the Nova team (news.json on GitHub)
@@ -112,6 +113,7 @@ const CHOICES = {
   kaiNoticeStyle: ['card', 'compact'],
   dustStyle: ['soft', 'thanos'],
   dustSpeed: ['slow', 'normal', 'fast'],
+  graphics: ['low', 'medium', 'high', 'veryHigh'],
   theme: ['kai-day', 'kai-night', 'kai-fern-day', 'kai-fern-night', 'original', 'bakka', 'outline', 'midnight', 'forest', 'snow', 'cat', 'galaxy', 'aurora', 'ocean', 'nody', 'lava', 'retro'],
 };
 // themes without glass: no screen capture behind them

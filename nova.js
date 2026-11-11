@@ -64,6 +64,18 @@ const appNotices = createNoticeBridge(
 // the per-app commands keep targeting the browser tab rather than the mini player.
 app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling');
 
+// Settings > Graphics. Most of the island's memory is the graphics driver's price for drawing on
+// the GPU; each step down draws more on the CPU. Measured on an AMD 660M (whole app, after use):
+// low ~230 MB / ~85 fps, medium ~270 MB / ~110 fps, high ~370 MB / ~105 fps, very high ~400 MB / 120 fps
+const GRAPHICS = {
+  low: () => app.disableHardwareAcceleration(),
+  medium: () => app.commandLine.appendSwitch('disable-gpu-compositing'),
+  high: () => { app.commandLine.appendSwitch('disable-gpu-rasterization'); app.commandLine.appendSwitch('num-raster-threads', '1'); },
+  veryHigh: () => {},
+};
+const graphics = features.get().graphics;
+(GRAPHICS[graphics] || GRAPHICS.veryHigh)();
+
 const WIN_W = 640;
 const WIN_H = 320;
 const PANEL_W = 548; // expanded island, in renderer.js and style.css
@@ -1432,6 +1444,12 @@ let prayerCalc = `${features.get().asrHanafi}|${features.get().hijriAdjust}`;
 let autoUpdate = features.get().autoUpdate;
 let newsOn = features.get().news;
 features.onChange((f) => {
+  // the graphics switches only take effect at launch
+  if (f.graphics !== graphics) {
+    app.relaunch();
+    app.exit(0);
+    return;
+  }
   appNotices.setEnabled(f.appNotices !== false);
   mediaWrite(f.appNotices !== false ? 'appnotify on' : 'appnotify off');
   evalSaver();

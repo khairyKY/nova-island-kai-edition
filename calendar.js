@@ -1,7 +1,7 @@
 // Upcoming meetings from a private iCal link (Google Calendar, Outlook.com, iCloud: "secret
 // address in iCal format"). No sign-in: the link itself is the key, so it is stored only in
 // calendar.json in the app's data folder and never logged.
-const ical = require('node-ical');
+// ponytail: loaded on the first fetch, so it costs nothing unless a calendar is linked (~5 MB)
 const settings = require('./settings');
 
 const REFRESH_MS = 10 * 60 * 1000;
@@ -74,7 +74,7 @@ async function refresh() {
     const body = await r.text();
     if (!body.includes('BEGIN:VCALENDAR')) throw new Error('not an iCal file');
     const now = new Date();
-    state = { events: occurrences(ical.sync.parseICS(body), now, new Date(+now + AHEAD_MS)), error: '', updated: Date.now() };
+    state = { events: occurrences(require('node-ical').sync.parseICS(body), now, new Date(+now + AHEAD_MS)), error: '', updated: Date.now() };
     timer = setTimeout(refresh, REFRESH_MS);
   } catch (err) {
     state = { ...state, error: err.name === 'TimeoutError' ? 'timeout' : err.message.slice(0, 120) };

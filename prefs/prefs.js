@@ -110,6 +110,9 @@ function showFeatures(f) {
   $$('[data-kai-style]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.kaiStyle === f.kaiNoticeStyle)));
   const dust = f.softDust === false ? 'off' : f.dustStyle || 'soft';
   $$('[data-dust]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.dust === dust)));
+  const g = f.graphics || 'veryHigh';
+  $$('[data-graphics]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.graphics === g)));
+  $('#graphics-note').textContent = GRAPHICS_NOTE[g];
   $$('[data-dust-speed]').forEach((b) => { b.setAttribute('aria-checked', String(b.dataset.dustSpeed === (f.dustSpeed || 'normal'))); b.disabled = dust === 'off'; });
   $$('[data-kai-preview]').forEach((b) => { b.disabled = !f.kaiNotifications; });
   $$('.th-card').forEach((c) => {
@@ -127,6 +130,17 @@ function showFeatures(f) {
     : 'Stays where it is; clicks go to the tabs below';
   showSteppers();
 }
+const GRAPHICS_NOTE = {
+  low: 'About 230 MB. Drawn on the CPU: the least memory, animations around 85 fps',
+  medium: 'About 270 MB. Nearly as smooth; the Pady drop is a little less fluid',
+  high: 'About 370 MB. Smooth, a little less memory than Very high',
+  veryHigh: 'About 400 MB. Drawn on the GPU: the smoothest, 120 fps',
+};
+$$('[data-graphics]').forEach((b) => b.addEventListener('click', () => {
+  if (b.getAttribute('aria-checked') === 'true') return;
+  // the island restarts to apply it
+  api.setFeatures({ graphics: b.dataset.graphics });
+}));
 $$('[data-dust-speed]').forEach((b) => b.addEventListener('click', () => {
   api.setFeatures({ dustSpeed: b.dataset.dustSpeed });
   saved();

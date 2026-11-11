@@ -94,6 +94,14 @@
                 <button role="radio" data-dust-speed="fast">Fast</button>
               </div>
             </div>
+            <div class="row"><div class="txt"><b>Graphics</b><small id="graphics-note">Lower uses less memory, higher is smoother. The island restarts to apply it</small></div>
+              <div class="seg" role="radiogroup" aria-label="Graphics">
+                <button role="radio" data-graphics="low">Low</button>
+                <button role="radio" data-graphics="medium">Medium</button>
+                <button role="radio" data-graphics="high">High</button>
+                <button role="radio" data-graphics="veryHigh">Very high</button>
+              </div>
+            </div>
             <label class="row"><b>Remove animations</b><input type="checkbox" class="sw" data-feature="noAnimations"></label>
             <label class="row" data-needs="!noBlur"><div class="txt"><b>Freeze glass while closed</b><small>The glass refreshes only while the island is open</small></div><input type="checkbox" class="sw" data-feature="glassFreeze"></label>
             <label class="row" id="saver-row"><div class="txt"><b>Battery saver</b><small id="saver-note">Turns all three on when the battery runs low</small></div><input type="checkbox" class="sw" data-feature="batterySaver"></label>
