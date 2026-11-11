@@ -68,6 +68,8 @@
     if (!state.visible || ['expanded', 'scene', 'reminder'].includes(mode) || Date.now() < state.toastUntil) return;
     show(queue.shift());
   }
+  // Settings > Animations preview: straight to the island (no dedupe, no per-app pause)
+  window.previewAppNotice = (notice) => { queue.push(notice); next(); };
   bridge.onAppNotice((notice) => {
     if (state.features.appNotices === false) return;
     // Pady's quick notices never wait behind another: the drop hangs below the island

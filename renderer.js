@@ -924,7 +924,7 @@ function updateMediaSource(m) {
   });
   $('#v-media').classList.toggle('spotify-source', source?.id === 'spotify');
 }
-bridge.onMedia((m) => {
+function onMediaUpdate(m) {
   if (m.error) return;
   const previous = state.media;
   const lock = state.playLock;
@@ -958,7 +958,7 @@ bridge.onMedia((m) => {
   const sourceChanged = m.source?.id !== previous.source?.id || m.source?.name !== previous.source?.name;
   if (key !== lastTrack) {
     window.songDust?.forget(); // the dust's pictures of the pill, card and panel show the old song
-    const songToSong = key && lastTrack && m.title && !state.mediaFront;
+    const songToSong = key && lastTrack && m.title && !state.mediaFront && !quietMedia;
     // Settings > Song change: 'card' grows the pill into the Now Playing card and changes the song
     // in there; 'pill' changes it in place. The open panel changes in place either way.
     const card = songToSong && state.features.songChange === 'card' && lastMode !== 'expanded';
@@ -1005,6 +1005,25 @@ bridge.onMedia((m) => {
   handleBrightness(m);
   render();
   syncProgress();
+}
+// Settings > Animations preview: fake songs for a while; the player's own updates wait, then come
+// back quietly (no song change animation for going back to the real song)
+let previewUntil = 0, realMedia = null, quietMedia = false, previewTimer = 0;
+window.previewMedia = (m, ms) => {
+  previewUntil = Date.now() + ms;
+  onMediaUpdate(m);
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    previewUntil = 0;
+    quietMedia = true;
+    onMediaUpdate(realMedia || { has: false });
+    quietMedia = false;
+  }, ms);
+};
+bridge.onMedia((m) => {
+  if (m.error) return;
+  realMedia = m;
+  if (Date.now() >= previewUntil) onMediaUpdate(m);
 });
 
 function mediaPos() {
@@ -1185,6 +1204,18 @@ function dismissToast() {
   reportRect();
   window.dispatchEvent(new Event('island:toast-end'));
 }
+// notices with their own animation around the island (style-2.css): the class plays it once
+const TOAST_FX = { perf: 1500, saver: 1600, 'saver-stays': 1500, 'saver-off': 1100, charging: 1400, low: 1400, battery: 1000 };
+let toastFxTimer = 0;
+function toastFx(kind) {
+  const cls = kind === 'perf' ? 'perf-burst' : `fx-${kind}`;
+  island.classList.remove(...[...island.classList].filter((c) => c.startsWith('fx-') || c === 'perf-burst'));
+  clearTimeout(toastFxTimer);
+  if (!TOAST_FX[kind] || state.features.noAnimations) return;
+  void island.offsetWidth; // so it plays again on a second one in a row
+  island.classList.add(cls, 'fx-burst');
+  toastFxTimer = setTimeout(() => island.classList.remove(cls, 'fx-burst'), TOAST_FX[kind]);
+}
 function showToast(kind, label, value, pct, ms = 3200, action = null) {
   state.toastAction = action;
   const t = $('.l-toast');
@@ -1203,6 +1234,7 @@ function showToast(kind, label, value, pct, ms = 3200, action = null) {
   reportRect();
   clearTimeout(toastTimer);
   toastTimer = setTimeout(dismissToast, ms + 50);
+  toastFx(kind);
 }
 
 function showHud(kind, value, muted) {
@@ -1458,15 +1490,12 @@ bridge.onFeatures(applyFeatures);
 bridge.onRecording((on) => document.body.classList.toggle('th-rec', !!on));
 // the battery saver switched off, the PC on Ultimate Performance: its own notice (style-2.css)
 function performanceMode(s) {
-  showToast('perf', 'Performance mode', s.hz ? `Ultimate · ${s.hz} Hz` : 'Ultimate', 0, 4500);
-  island.classList.remove('perf-burst');
-  void island.offsetWidth; // so the pulse plays again on a second switch
-  island.classList.add('perf-burst');
-  setTimeout(() => island.classList.remove('perf-burst'), 1500);
+  showToast('perf', 'Performance mode', s.hz ? `Ultimate · ${s.hz} Hz` : 'Ultimate', 0, 4500); // (its burst: toastFx)
 }
-bridge.onSaver((s) => s.perf ? performanceMode(s) : showToast('saver',
+window.saverToast = (s) => s.perf ? performanceMode(s) : showToast(s.stays ? 'saver-stays' : s.on ? 'saver' : 'saver-off',
   s.stays ? 'Battery saver stays on' : s.on ? 'Battery saver is on' : 'Battery saver is off',
-  s.stays ? `${s.pct}% · below ${s.at}%` : s.pct >= 0 ? `${s.pct}%` : '', 0, 3500));
+  s.stays ? `${s.pct}% · below ${s.at}%` : s.pct >= 0 ? `${s.pct}%` : '', 0, 3500);
+bridge.onSaver(window.saverToast);
 bridge.onVisibility((v) => {
   state.visible = !!v;
   syncProgress();

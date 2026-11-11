@@ -25,6 +25,7 @@
     const duration = (state.features.kaiNoticeSeconds || 8) * 1000;
     showToast('kai-flow', notice.title, notice.body, 0, duration, claude ? null : () => bridge.apps.launch('com.kaisflow.garden'));
   }
+  window.previewKaiNotice = (notice) => { queue.push(notice); next(); }; // Settings > Animations preview
   bridge.onKaiNotice((notice) => {
     if (!allowed(notice)) return;
     if (queue.length >= 20) queue.shift();

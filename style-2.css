@@ -226,3 +226,159 @@ body.no-anim .pd-pill { animation: none; }
 .perf-fx .sparks b:nth-child(8) { --dx: -44px; --dy: -2px; animation-delay: .38s; }
 .perf-fx .sparks b:nth-child(9) { --dx: -76px; --dy: 9px; animation-delay: .42s; }
 .perf-fx .sparks b:nth-child(10) { --dx: -36px; --dy: 6px; animation-delay: .46s; }
+
+/* ======== the rest of the battery notices, each with its own story (renderer.js toastFx) ======== */
+/* the effect layer inside the pill, and the one around the island, shared with Performance mode */
+.l-toast:is(.saver, .saver-stays, .saver-off, .charging, .low, .battery) { isolation: isolate; }
+.l-toast:is(.saver, .saver-stays, .saver-off, .charging, .low, .battery) .t-speed {
+  display: block; position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none; }
+#island.fx-burst .perf-fx { display: block; }
+/* sparks only for the notices that have them (Performance, Saver on, Charging) */
+#island.fx-burst:not(.perf-burst, .fx-saver, .fx-charging) .perf-fx { display: none; }
+@keyframes fx-converge {
+  0% { transform: translate(var(--dx), var(--dy)) scale(.5); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translate(0, 0) scale(1.1); opacity: 0; }
+}
+
+/* ---- Battery saver on: the island powers down. It exhales, a green halo collapses onto it, motes
+   drift in, a dimming wave passes over, a leaf sprouts ---- */
+.l-toast.saver, .l-toast.saver-off { --eco: 52, 211, 153; }
+.l-toast.saver .ico-bolt, .l-vtoast.saver .ico-bolt { display: none; }
+.l-toast.saver .ico-sprout { display: block; color: rgb(var(--eco)); transform-origin: 50% 90%;
+  animation: fx-sprout .9s cubic-bezier(.3, 1.5, .5, 1) .15s both; filter: drop-shadow(0 0 4px rgba(var(--eco), .7)); }
+@keyframes fx-sprout {
+  from { transform: scale(.15) rotate(-35deg); opacity: 0; }
+  60% { transform: scale(1.2) rotate(6deg); opacity: 1; }
+  to { transform: none; }
+}
+.l-toast.saver #t-value { color: rgb(var(--eco)); }
+.l-toast.saver :is(#t-label, #t-value) { animation: fx-breathe-in .8s cubic-bezier(.2, .7, .2, 1) .2s both; }
+.l-toast.saver #t-value { animation-delay: .35s; }
+@keyframes fx-breathe-in { from { opacity: 0; filter: blur(5px); transform: scale(.94); } to { opacity: 1; filter: none; transform: none; } }
+/* a dimming wave sweeps across, then a calm green breath */
+.l-toast.saver .t-speed { animation: fx-calm 1.6s ease-in-out both; }
+@keyframes fx-calm {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(52, 211, 153, 0); }
+  45% { box-shadow: inset 0 0 18px 10px rgba(52, 211, 153, .32); }
+}
+.l-toast.saver .t-speed::before { content: ''; position: absolute; inset: 0 -40%;
+  background: linear-gradient(90deg, transparent, rgba(10, 40, 30, .12) 35%, rgba(10, 40, 30, .12) 65%, transparent);
+  animation: fx-dim .95s cubic-bezier(.45, 0, .55, 1) both; }
+@keyframes fx-dim { from { translate: 70% 0; opacity: 0; } 30% { opacity: 1; } to { translate: -70% 0; opacity: 0; } }
+/* the island exhales and settles */
+#island.fx-saver .clip { animation: fx-exhale 1.2s cubic-bezier(.4, 0, .2, 1), fx-implode 1.3s cubic-bezier(.3, 0, .2, 1); }
+@keyframes fx-exhale { 0% { transform: none; } 30% { transform: scale(1.035, 1.05); } 65% { transform: scale(.975); } 100% { transform: none; } }
+@keyframes fx-implode {
+  0% { box-shadow: 0 0 0 30px rgba(52, 211, 153, 0), 0 0 0 0 rgba(52, 211, 153, 0); }
+  45% { box-shadow: 0 0 0 3px rgba(52, 211, 153, .75), 0 0 22px 4px rgba(52, 211, 153, .45); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0), 0 0 30px 8px rgba(52, 211, 153, 0); }
+}
+/* green motes drift in from all around and fade into it */
+#island.fx-saver .perf-fx .sparks { left: 50%; }
+#island.fx-saver .perf-fx .sparks b { background: #d1fae5; box-shadow: 0 0 6px 2px rgba(52, 211, 153, .9); animation: fx-converge 1.1s cubic-bezier(.3, 0, .3, 1) both; }
+#island.fx-saver .sparks b:nth-child(1) { --dx: -150px; --dy: -24px; animation-delay: 0s; }
+#island.fx-saver .sparks b:nth-child(2) { --dx: 140px; --dy: 20px; animation-delay: .05s; }
+#island.fx-saver .sparks b:nth-child(3) { --dx: -110px; --dy: 30px; animation-delay: .1s; }
+#island.fx-saver .sparks b:nth-child(4) { --dx: 120px; --dy: -28px; animation-delay: .15s; }
+#island.fx-saver .sparks b:nth-child(5) { --dx: -180px; --dy: 8px; animation-delay: .2s; }
+#island.fx-saver .sparks b:nth-child(6) { --dx: 175px; --dy: -6px; animation-delay: .25s; }
+#island.fx-saver .sparks b:nth-child(7) { --dx: -70px; --dy: -34px; animation-delay: .3s; }
+#island.fx-saver .sparks b:nth-child(8) { --dx: 80px; --dy: 34px; animation-delay: .35s; }
+#island.fx-saver .sparks b:nth-child(9) { --dx: -40px; --dy: 36px; animation-delay: .4s; }
+#island.fx-saver .sparks b:nth-child(10) { --dx: 45px; --dy: -36px; animation-delay: .45s; }
+
+/* ---- Battery saver stays on (battery still low): amber, holding. A ring locks on and holds, two
+   slow heartbeats through the pill, the bolt locks ---- */
+.l-toast.saver-stays { --amber: 251, 176, 36; }
+.l-toast.saver-stays .ico-bolt { display: block; color: rgb(var(--amber)); animation: fx-lock 1.1s cubic-bezier(.3, 1.6, .5, 1) .1s both; filter: drop-shadow(0 0 4px rgba(var(--amber), .7)); }
+@keyframes fx-lock { 0% { transform: scale(.4); opacity: 0; } 35% { transform: scale(1.3); opacity: 1; } 55% { transform: scale(.85); } 75% { transform: scale(1.08); } 100% { transform: none; } }
+.l-toast.saver-stays .batt { display: none; }
+.l-toast.saver-stays #t-value { color: rgb(var(--amber)); }
+.l-toast.saver-stays :is(#t-label, #t-value) { animation: fx-drop-in .6s cubic-bezier(.3, 1.5, .5, 1) .12s both; }
+.l-toast.saver-stays #t-value { animation-delay: .25s; }
+@keyframes fx-drop-in { from { opacity: 0; transform: translateY(-9px); } to { opacity: 1; transform: none; } }
+.l-toast.saver-stays .t-speed { animation: fx-heartbeat 1.5s ease-in-out both; }
+@keyframes fx-heartbeat {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(251, 176, 36, 0); }
+  15% { box-shadow: inset 0 0 16px 8px rgba(251, 176, 36, .4); }
+  30% { box-shadow: inset 0 0 0 0 rgba(251, 176, 36, .05); }
+  48% { box-shadow: inset 0 0 16px 8px rgba(251, 176, 36, .35); }
+  70% { box-shadow: inset 0 0 0 0 rgba(251, 176, 36, 0); }
+}
+#island.fx-saver-stays .clip { animation: fx-hold 1.4s cubic-bezier(.2, .7, .2, 1); }
+@keyframes fx-hold {
+  0% { box-shadow: 0 0 0 14px rgba(251, 176, 36, 0); }
+  25% { box-shadow: 0 0 0 2px rgba(251, 176, 36, .9), 0 0 18px 3px rgba(251, 176, 36, .5); }
+  70% { box-shadow: 0 0 0 2px rgba(251, 176, 36, .8), 0 0 18px 3px rgba(251, 176, 36, .35); }
+  100% { box-shadow: 0 0 0 0 rgba(251, 176, 36, 0); }
+}
+
+/* ---- Battery saver off on its own (charged back up): a gentle wake, a warm sweep and a lift ---- */
+.l-toast.saver-off .ico-bolt { display: block; color: #fcd34d; animation: fx-sprout .7s cubic-bezier(.3, 1.5, .5, 1) .1s both; }
+.l-toast.saver-off .batt { display: none; }
+.l-toast.saver-off .t-speed::before { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(252, 211, 77, .45) 50%, transparent 70%) -120% 0 / 60% 100% no-repeat;
+  animation: fx-sweep .9s cubic-bezier(.4, 0, .2, 1) .1s both; }
+@keyframes fx-sweep { to { background-position: 260% 0; } }
+#island.fx-saver-off .clip { animation: fx-lift .8s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes fx-lift { 0% { transform: none; } 40% { transform: translateY(-2px) scale(1.02); } 100% { transform: none; } }
+
+/* ---- Charging: energy flows in. The bolt strikes in with flashes, the battery fills like liquid,
+   green streaks run into the bolt, sparks converge on it ---- */
+.l-toast.charging { --charge: 48, 209, 88; }
+.l-toast.charging .ico-bolt { animation: fx-strike .75s steps(1, end) 0s both, fx-strike-in .5s cubic-bezier(.3, 1.6, .5, 1) both; filter: drop-shadow(0 0 5px rgba(var(--charge), .9)); }
+@keyframes fx-strike-in { from { transform: translateY(-8px) scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fx-strike { 0% { color: #fff; } 18% { color: rgb(48, 209, 88); } 32% { color: #fff; } 46%, 100% { color: rgb(48, 209, 88); } }
+.l-toast.charging .batt b { position: relative; overflow: hidden; animation: fx-fill 1s cubic-bezier(.3, 0, .2, 1) .15s both; box-shadow: 0 0 6px rgba(var(--charge), .8); }
+@keyframes fx-fill { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+.l-toast.charging .batt b::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .8), transparent) -100% 0 / 50% 100% no-repeat; animation: fx-sweep .9s ease-in-out .55s 2; }
+.l-toast.charging .t-speed::before, .l-toast.charging .t-speed::after { content: ''; position: absolute; inset: 0 -80%;
+  background:
+    linear-gradient(90deg, rgba(48, 209, 88, .95), rgba(48, 209, 88, .5) 30%, transparent) 30% 30% / 26% 2px no-repeat,
+    linear-gradient(90deg, #d9ffe4, rgba(48, 209, 88, .5) 30%, transparent) 50% 55% / 34% 2px no-repeat,
+    linear-gradient(90deg, rgba(48, 209, 88, .9), transparent) 68% 75% / 22% 1.5px no-repeat;
+  animation: perf-streak .5s cubic-bezier(.4, 0, .6, 1) .08s both; filter: drop-shadow(0 0 2px rgba(48, 209, 88, .9)); }
+.l-toast.charging .t-speed::after { transform: scaleY(-1); animation-delay: .32s; }
+#island.fx-charging .clip { animation: fx-charge-pulse 1.2s cubic-bezier(.2, .7, .3, 1); }
+@keyframes fx-charge-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0); }
+  35% { box-shadow: 0 0 0 2px rgba(48, 209, 88, .85), 0 0 22px 5px rgba(48, 209, 88, .5); }
+  100% { box-shadow: 0 0 0 16px rgba(48, 209, 88, 0), 0 0 26px 8px rgba(48, 209, 88, 0); }
+}
+#island.fx-charging .perf-fx .sparks { left: 18px; }
+#island.fx-charging .perf-fx .sparks b { background: #d9ffe4; box-shadow: 0 0 6px 2px rgba(48, 209, 88, .95); animation: fx-converge .7s cubic-bezier(.5, 0, .7, 1) both; }
+
+/* ---- Low battery: an alarm. Two red flashes through the pill, a double heartbeat ring, the island
+   shivers, the battery bar blinks ---- */
+.l-toast.low { --alarm: 255, 69, 58; }
+.l-toast.low .t-speed { animation: fx-alarm 1.2s ease-out both; }
+@keyframes fx-alarm {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(255, 69, 58, 0); }
+  10%, 40% { box-shadow: inset 0 0 18px 30px rgba(255, 69, 58, .42); }
+  25%, 60% { box-shadow: inset 0 0 0 0 rgba(255, 69, 58, .05); }
+}
+.l-toast.low .batt b { animation: fx-blink .4s steps(1, end) .1s 4; }
+@keyframes fx-blink { 50% { opacity: .15; } }
+.l-toast.low .ico-bolt { animation: fx-blink .4s steps(1, end) .1s 4; filter: drop-shadow(0 0 4px rgba(var(--alarm), .8)); }
+.l-toast.low :is(#t-label, #t-value) { animation: fx-drop-in .5s cubic-bezier(.3, 1.5, .5, 1) .05s both; }
+#island.fx-low .clip { animation: fx-shiver .5s linear, fx-double-beat 1.2s cubic-bezier(.2, .7, .3, 1); }
+@keyframes fx-shiver {
+  0%, 100% { transform: none; } 10% { transform: translateX(-2.5px); } 20% { transform: translateX(2.5px); } 30% { transform: translateX(-2px); }
+  40% { transform: translateX(2px); } 50% { transform: translateX(-1.5px); } 60% { transform: translateX(1.5px); } 75% { transform: translateX(-.8px); }
+}
+@keyframes fx-double-beat {
+  0% { box-shadow: 0 0 0 0 rgba(255, 69, 58, .9); }
+  22% { box-shadow: 0 0 0 12px rgba(255, 69, 58, 0), 0 0 18px 4px rgba(255, 69, 58, .45); }
+  30% { box-shadow: 0 0 0 0 rgba(255, 69, 58, .9); }
+  55% { box-shadow: 0 0 0 16px rgba(255, 69, 58, 0), 0 0 22px 6px rgba(255, 69, 58, .35); }
+  100% { box-shadow: 0 0 0 18px rgba(255, 69, 58, 0); }
+}
+
+/* ---- On battery (unplugged): the cord's pulled. A dip, a bounce, a cool glint ---- */
+#island.fx-battery .clip { animation: fx-unplug .7s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes fx-unplug { 0% { transform: none; } 30% { transform: translateY(3px) scale(.985); } 100% { transform: none; } }
+.l-toast.battery .t-speed::before { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(200, 225, 255, .5) 50%, transparent 70%) -120% 0 / 60% 100% no-repeat;
+  animation: fx-sweep .8s cubic-bezier(.4, 0, .2, 1) .2s both; }
+.l-toast.battery :is(#t-label, #t-value) { animation: fx-drop-in .5s cubic-bezier(.3, 1.5, .5, 1) .05s both; }

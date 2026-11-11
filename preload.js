@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('nova', {
   ready: () => ipcRenderer.send('island-ready'),
   onReminderNow: on('reminder-now'),
   onPhoenixPreview: on('phoenix-preview'),
+  onAnimationPreview: on('animation-preview'),
   onVisibility: on('visibility'),
   onPrivacy: on('privacy'),
   onCalendar: on('calendar'),

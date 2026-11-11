@@ -584,3 +584,6 @@ updBtn.addEventListener('click', async () => {
 });
 api.updateState().then(showUpdate);
 api.onUpdate((u) => showUpdate({ status: 'ready', version: u?.version }));
+
+// Preview animations: played on the island (views/previews.js)
+$$('[data-preview]').forEach((b) => b.addEventListener('click', () => api.previewAnimation(b.dataset.preview)));

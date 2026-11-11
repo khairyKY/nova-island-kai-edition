@@ -965,8 +965,9 @@ features.onChange((f) => {
   // and the notice is shown after it
   const restart = effGraphics(f) !== graphics;
   restartPending = restart; // the notice is shown by the restarted island, not this one
+  holdSaverNotice();
   pcSaver(saverNow).catch((err) => log.info(`pc battery saver: ${err.message}`)).finally(() => {
-    if (!restart) { saverSwitching = false; return; }
+    if (!restart) { saverSwitching = false; releaseSaverNotice(SCREEN_BACK_MS); return; }
     app.relaunch({ args: [...process.argv.slice(1).filter((a) => !a.startsWith('--saver-notice=')), `--saver-notice=${saverNow ? 'on' : `perf:${hz}`}`] });
     app.exit(0);
   });
@@ -992,15 +993,33 @@ function perf() {
 }
 let perfNext = null;
 let restartPending = false;
+// Switching the PC's part changes the refresh rate, which blanks the screen for a second or two:
+// the notice waits until that's done and the screen is back (and the island keeps its animations
+// until the notice has played)
+const SCREEN_BACK_MS = 2200;
+let noticeHeld = false, heldNotice = null;
+function holdSaverNotice() { noticeHeld = true; saverQuietUntil = Infinity; }
+function releaseSaverNotice(ms) {
+  setTimeout(() => {
+    noticeHeld = false;
+    const p = heldNotice;
+    heldNotice = null;
+    if (p) saverNotice(p);
+    else { saverQuietUntil = 0; applyPerf(); }
+  }, ms);
+}
 function saverNotice(payload) {
   if (restartPending) return;
   if (!payload.on && perfNext) Object.assign(payload, { perf: true, hz: perfNext.hz });
   perfNext = null;
+  if (noticeHeld) { heldNotice = payload; return; }
   saverQuietUntil = Date.now() + 3800;
   applyPerf();
   send('saver', payload);
   setTimeout(applyPerf, 3850);
 }
+// restarted by the saver switch: hold its notices from the start (released 2.2 s after it's ready)
+if (process.argv.some((a) => a.startsWith('--saver-notice='))) holdSaverNotice();
 const perfSlow = () => Object.values(perf()).some(Boolean);
 function islandFeatures() {
   return { ...settingsFeatures(), ...perf(), saver: saverOn };
@@ -1430,7 +1449,14 @@ ipcMain.on('island-ready', () => {
   // restarted by the battery saver switch (for Graphics > Low): the notice it would have shown
   const notice = process.argv.find((a) => a.startsWith('--saver-notice='));
   // (switched on, the island's own start shows 'Battery saver is on' already)
-  if (notice?.includes('=perf')) setTimeout(() => { perfNext = { hz: +notice.split(':')[1] || 0 }; saverNotice({ on: saverOn, pct: battery.pct, stays: saverOn, at: features.get().batterySaverAt }); }, 1200);
+  if (notice) {
+    // (the screen may still be coming back from the refresh-rate change made before the restart)
+    if (notice.includes('=perf')) {
+      perfNext = { hz: +notice.split(':')[1] || 0 };
+      saverNotice({ on: saverOn, pct: battery.pct, stays: saverOn, at: features.get().batterySaverAt });
+    }
+    releaseSaverNotice(SCREEN_BACK_MS);
+  }
 });
 ipcMain.on('update-install', () => updater.install());
 // Settings > General: check now, and "Update now" (the island counts down, as its own card does)
@@ -1451,6 +1477,10 @@ ipcMain.handle('island-features', () => islandFeatures());
 ipcMain.on('features-set', (_e, patch) => features.set(patch));
 ipcMain.on('features-reset', () => features.reset());
 ipcMain.on('reminder-preview', () => send('reminder-now'));
+// Settings > Animations preview: played on the island (views/previews.js), from made-up data
+ipcMain.on('animation-preview', (e, id) => {
+  if (prefsWindow.owns(e.sender) && /^[a-z-]{2,20}$/.test(String(id))) send('animation-preview', id);
+});
 ipcMain.on('phoenix-preview', (e, id) => {
   if (prefsWindow.owns(e.sender) && companionStates.some(pose => pose.id === id)) send('phoenix-preview',id);
 });

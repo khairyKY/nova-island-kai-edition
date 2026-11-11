@@ -279,3 +279,10 @@ body.searching .chip.miss { display: none !important; }
 .phoenix-state-label img { width: 44px; height: 44px; object-fit: contain; flex: none; }
 .phoenix-state-label .txt { min-width: 0; }
 .th-card[data-theme^="kai-"] .th-pill { background: var(--th-tint); box-shadow: inset 0 0 0 1px var(--th-line), inset 0 1px 0 rgba(255,255,255,.4), 0 5px 12px rgba(0,0,0,.14); }
+
+/* Preview animations: a wrap of small buttons per row */
+.row.previews { align-items: flex-start; gap: 14px; }
+.row.previews > b { padding-top: 6px; min-width: 76px; }
+.preview-btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.preview-btns .btn { height: 28px; padding: 0 11px; font-size: 12px; }
+.group > .hint { margin: 8px 4px 0; font-size: 12px; color: var(--text-2); }
