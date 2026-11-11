@@ -71,7 +71,8 @@
   // instead of a blank frame while the PNG decodes
   const decoded=new Set(), keep=[];
   function preload(){
-    if(!PhoenixStates.usesArtwork(style()))return;
+    // Graphics: Low decodes a pose when it's shown instead of keeping them all
+    if(!PhoenixStates.usesArtwork(style()) || state.features.graphics === 'low')return;
     for(const pose of poses.values()){
       const src=PhoenixStates.sourceFor(pose,style());
       if(decoded.has(src))continue;

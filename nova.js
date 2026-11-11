@@ -66,9 +66,15 @@ app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling');
 
 // Settings > Graphics. Most of the island's memory is the graphics driver's price for drawing on
 // the GPU; each step down draws more on the CPU. Measured on an AMD 660M (whole app, after use):
-// low ~230 MB / ~85 fps, medium ~270 MB / ~110 fps, high ~370 MB / ~105 fps, very high ~400 MB / 120 fps
+// low ~205 MB / ~85 fps, medium ~270 MB / ~110 fps, high ~370 MB / ~105 fps, very high ~400 MB / 120 fps
 const GRAPHICS = {
-  low: () => app.disableHardwareAcceleration(),
+  low: () => {
+    app.disableHardwareAcceleration();
+    // nothing is drawn on a GPU, so its process folds into this one; small caches and V8 heaps
+    app.commandLine.appendSwitch('in-process-gpu');
+    app.commandLine.appendSwitch('skia-resource-cache-limit-mb', '4');
+    app.commandLine.appendSwitch('js-flags', '--optimize-for-size --max-semi-space-size=1');
+  },
   medium: () => app.commandLine.appendSwitch('disable-gpu-compositing'),
   high: () => { app.commandLine.appendSwitch('disable-gpu-rasterization'); app.commandLine.appendSwitch('num-raster-threads', '1'); },
   veryHigh: () => {},
