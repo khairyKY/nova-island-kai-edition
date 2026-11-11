@@ -211,13 +211,6 @@
       $('#i-pr-left').textContent = left(ms);
       $('#v-pr-name').textContent = NAMES[next.key];
       $('#v-pr-left').textContent = shortLeft(ms);
-      // the ring: how much of the time since the last prayer has gone (before fajr, since last night's isha)
-      const passed = PRAYERS.map((k) => at(d.today.date, d.today.times[k])).filter((t) => t <= now);
-      const prev = passed.length ? passed.at(-1) : new Date(+at(d.today.date, d.today.times.isha) - 864e5);
-      const share = Math.min(1, Math.max(0, (now - prev) / Math.max(1, next.time - prev)));
-      const ring = $('#i-pr-ring');
-      ring.style.setProperty('--pr-pct', (share * 100).toFixed(1));
-      ring.classList.toggle('soon', ms <= 15 * 60000);
     }
     $('#pr-hijri').textContent = d.today.hijri || '';
     ramadan(d, now);
