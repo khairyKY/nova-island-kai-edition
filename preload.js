@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('nova', {
   onPhoenixPreview: on('phoenix-preview'),
   onAnimationPreview: on('animation-preview'),
   onWhatsNew: on('whats-new'),
+  onSaverSuggest: on('saver-suggest'),
+  saverTurnOn: () => ipcRenderer.send('saver-turn-on'),
   onVisibility: on('visibility'),
   onPrivacy: on('privacy'),
   onCalendar: on('calendar'),

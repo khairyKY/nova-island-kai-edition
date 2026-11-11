@@ -49,6 +49,7 @@
     'saver-on': () => window.saverToast({ on: true, pct: 42 }),
     'saver-stays': () => window.saverToast({ on: true, pct: 18, stays: true, at: 20 }),
     'saver-off': () => window.saverToast({ on: false, pct: 64 }),
+    'saver-suggest': () => window.saverSuggest({ title: 'Physics lecture', inMin: 12, life: 3900 }),
     performance: () => window.saverToast({ on: false, pct: 64, perf: true, hz: 120 }),
     charging: () => showToast('charging', 'Charging', '64%', 0.64),
     'low-battery': () => showToast('low', 'On Battery', '12%', 0.12),

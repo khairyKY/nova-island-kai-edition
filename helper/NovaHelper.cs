@@ -158,13 +158,16 @@ static class Win {
   }
   [DllImport("kernel32.dll")] static extern bool GetSystemPowerStatus(out SYSTEM_POWER_STATUS s);
 
-  // battery percent (-1: no battery, e.g. a desktop PC) and whether the charger is plugged in
-  public static void Battery(out int pct, out bool ac) {
+  // battery percent (-1: no battery, e.g. a desktop PC), whether the charger is plugged in, and
+  // Windows' own estimate of the time left on battery in seconds (-1: unknown, or charging)
+  public static void Battery(out int pct, out bool ac) { int life; Battery(out pct, out ac, out life); }
+  public static void Battery(out int pct, out bool ac, out int life) {
     SYSTEM_POWER_STATUS s;
-    pct = -1; ac = true;
+    pct = -1; ac = true; life = -1;
     if (!GetSystemPowerStatus(out s)) return;
     ac = s.ACLineStatus != 0;
     if ((s.BatteryFlag & 128) == 0 && s.BatteryLifePercent <= 100) pct = s.BatteryLifePercent;
+    if (!ac && s.BatteryLifeTime > 0) life = s.BatteryLifeTime;
   }
 
   [StructLayout(LayoutKind.Sequential)] struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
@@ -903,7 +906,7 @@ static class Program {
       try { o.Add("kl", Win.KeyboardLayout()).Add("caps", Win.CapsLock()); } catch { }
       try { long seq = Win.ClipboardSeq(); o.Add("clip", (double)seq).Add("clipPriv", Win.ClipboardPrivate(seq)); } catch { }
       try { o.Add("idle", Win.IdleSeconds()); } catch { }
-      try { int pct; bool ac; Win.Battery(out pct, out ac); o.Add("bat", pct).Add("ac", ac); } catch { }
+      try { int pct, life; bool ac; Win.Battery(out pct, out ac, out life); o.Add("bat", pct).Add("ac", ac).Add("batLife", life); } catch { }
       if (DateTime.UtcNow >= nextRecorder) { try { rec = Win.RecorderRunning(); } catch { } nextRecorder = DateTime.UtcNow.AddSeconds(2); }
       o.Add("rec", rec);
       if (privacyEnabled && DateTime.UtcNow >= nextPrivacy) {

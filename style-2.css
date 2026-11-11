@@ -394,3 +394,16 @@ body.no-anim .pd-pill { animation: none; }
 .i-pr-ring.soon .pr-val { opacity: 1; filter: drop-shadow(0 0 2px rgba(240, 178, 50, .85)); animation: pr-breathe 2.4s ease-in-out infinite; }
 @keyframes pr-breathe { 50% { filter: drop-shadow(0 0 4px rgba(240, 178, 50, 1)); opacity: .7; } }
 body.no-anim .i-pr-ring.soon .pr-val { animation: none; }
+
+/* before a class the battery won't last through: a suggestion, the saver one tap away */
+.l-toast.suggest .ico-bolt { display: block; color: #f0b232; animation: fx-lock 1s cubic-bezier(.3, 1.6, .5, 1) .1s both; }
+.l-toast.suggest .batt { display: none; }
+.l-toast.suggest .t-left { min-width: 0; }
+.l-toast.suggest #t-label { overflow: hidden; text-overflow: ellipsis; }
+.l-toast.suggest #t-value { height: 24px; padding: 0 12px; border-radius: 99px; display: inline-flex; align-items: center; flex: none;
+  background: #f0b232; color: #2b1d00; font-weight: 700; cursor: pointer; box-shadow: 0 0 10px rgba(240, 178, 50, .5); }
+
+/* notices with more to say than the 340 px pill holds (renderer.js WIDE_TOASTS mirrors these) */
+#island.toast:not(.vertical):is([data-wide-toast="saver"], [data-wide-toast="saver-stays"], [data-wide-toast="saver-off"], [data-wide-toast="perf"]) { --w: 400px; }
+#island.toast:not(.vertical):is([data-wide-toast="battery"], [data-wide-toast="low"]) { --w: 380px; }
+#island.toast:not(.vertical)[data-wide-toast="suggest"] { --w: 470px; }

@@ -54,6 +54,7 @@ const DEFAULTS = {
   graphics: 'veryHigh', // how it's drawn, memory against smoothness (nova.js, applied on a restart)
   focusApps: 'vlc', // notices wait while one of these apps is in front (process names), and come after
   saverShortcut: false, // Ctrl+Alt+B (Pady's 4-finger hold) switches Battery saver now: opt-in, it changes the PC's settings
+  saverSuggest: true, // before a calendar event the battery won't last through, the island suggests the saver
   saverNow: false, // switched by hand (Settings, the tray, Ctrl+Alt+B, Pady): the island's saver + Windows' Battery saver
   batterySaver: false,
   batterySaverAt: 20, // percent

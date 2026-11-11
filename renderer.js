@@ -131,7 +131,9 @@ function render() {
   }
   const kaiNotice = mode === 'toast' && state.toast === 'kai-flow';
   const sideHud = mode === 'toast' && (state.toast === 'vol' || state.toast === 'bright');
-  const changedToastSize = kaiNotice !== island.classList.contains('kai-notice') || sideHud !== island.classList.contains('side-hud');
+  const wideToast = mode === 'toast' && !!WIDE_TOASTS[state.toast] ? state.toast : '';
+  const changedToastSize = kaiNotice !== island.classList.contains('kai-notice') || sideHud !== island.classList.contains('side-hud') || wideToast !== (island.dataset.wideToast || '');
+  island.dataset.wideToast = wideToast;
   island.classList.toggle('kai-notice', kaiNotice);
   island.classList.toggle('side-hud', sideHud);
   const noticeClose = $('#kai-notice-close');
@@ -307,6 +309,8 @@ const DIMS = {
   idle: [236, 32], compact: [300, 32], toast: [340, 34], peek: [400, 78], expanded: [548, 232],
 };
 const COMPACT_WIDE = 380; // compact with a title (media / download)
+// notices with more to say than the 340 px pill holds (battery time left, the saver suggestion)
+const WIDE_TOASTS = { saver: 400, 'saver-stays': 400, 'saver-off': 400, perf: 400, battery: 380, low: 380, suggest: 470 };
 const VDIMS = { ...DIMS, idle: [44, 244], compact: [44, 136], toast: [44, 168] };
 let anchor = { x: window.innerWidth / 2, y: 8, docked: false, vertical: false, side: 'right' };
 
@@ -314,6 +318,8 @@ function positionIsland() {
   let [w, h] = (anchor.vertical ? VDIMS : DIMS)[lastMode] || DIMS.idle;
   if (lastMode === 'toast' && state.toast === 'kai-flow') {
     [w, h] = state.features.kaiNoticeStyle === 'compact' ? [380, 74] : [420, 110];
+  } else if (lastMode === 'toast' && !anchor.vertical && WIDE_TOASTS[state.toast]) {
+    w = WIDE_TOASTS[state.toast];
   } else if (anchor.vertical && lastMode === 'toast' && !island.classList.contains('side-hud')) {
     [w, h] = [340, 76];
   }
@@ -1268,7 +1274,8 @@ function showHud(kind, value, muted) {
 if (navigator.getBattery) {
   navigator.getBattery().then((b) => {
     let lowShown = false;
-    const pct = () => `${Math.round(b.level * 100)}%`;
+    // with the time left on battery when Windows knows it ("12% · ~25 min")
+    const pct = () => [`${Math.round(b.level * 100)}%`, b.charging ? '' : timeLeft(b.dischargingTime)].filter(Boolean).join(' · ');
     b.addEventListener('chargingchange', () => {
       if (!feat('battery')) return;
       if (b.charging) showToast('charging', 'Charging', pct(), b.level);
@@ -1509,10 +1516,22 @@ bridge.onRecording((on) => document.body.classList.toggle('th-rec', !!on));
 function performanceMode(s) {
   showToast('perf', 'Performance mode', s.hz ? `Ultimate · ${s.hz} Hz` : 'Ultimate', 0, 4500); // (its burst: toastFx)
 }
+// the time left on battery as people say it: "~2 h 10 min", "~25 min" ('' when unknown / charging)
+function timeLeft(sec) {
+  if (!(sec > 0) || !Number.isFinite(sec)) return '';
+  const min = Math.max(1, Math.round(sec / 60));
+  return min >= 60 ? `~${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}` : `~${min} min`;
+}
 window.saverToast = (s) => s.perf ? performanceMode(s) : showToast(s.stays ? 'saver-stays' : s.on ? 'saver' : 'saver-off',
   s.stays ? 'Battery saver stays on' : s.on ? 'Battery saver is on' : 'Battery saver is off',
-  s.stays ? `${s.pct}% · below ${s.at}%` : s.pct >= 0 ? `${s.pct}%` : '', 0, 3500);
+  [s.pct >= 0 ? `${s.pct}%` : '', s.stays ? `below ${s.at}%` : timeLeft(s.life)].filter(Boolean).join(' · '), 0, 3500);
 bridge.onSaver(window.saverToast);
+// before a class the battery won't last through: a nudge, with the saver one tap away
+window.saverSuggest = (s) => showToast('suggest', `${s.title} in ${s.inMin} min · battery ${timeLeft(s.life) || 'low'}`, 'Turn on saver', 0, 12000, () => {
+  bridge.saverTurnOn();
+  dismissToast();
+});
+bridge.onSaverSuggest(window.saverSuggest);
 // just updated: the companion celebrates it, and its button opens Settings › What's new
 bridge.onWhatsNew((w) => {
   const open = () => bridge.openSettings('whats-new');

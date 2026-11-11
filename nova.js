@@ -642,7 +642,7 @@ function startMedia() {
         }
         if (typeof data.clip === 'number') onClipboardSeq(data.clip, !!data.clipPriv);
         if (data.privacy) privacy.onHelper(data.privacy);
-        if (typeof data.bat === 'number') onBattery(data.bat, data.ac !== false);
+        if (typeof data.bat === 'number') onBattery(data.bat, data.ac !== false, typeof data.batLife === 'number' ? data.batLife : -1);
         if (typeof data.rec === 'boolean' && data.rec !== recording) {
           recording = data.rec;
           log.info(`screen recorder ${recording ? 'running: glass paused' : 'gone: glass back'}`);
@@ -962,6 +962,19 @@ function syncSaverShortcut() {
   if (!globalShortcut.register('CommandOrControl+Alt+B', toggleSaver)) log.info('Ctrl+Alt+B is taken by another app');
 }
 features.onChange(() => { if (app.isReady()) syncSaverShortcut(); });
+// Before a class: the next calendar event (Settings > Calendar) starts within 20 min and the battery,
+// at the rate it's going, won't last until it ends: the island suggests the saver, once per event
+const SUGGEST_AHEAD_MS = 20 * 60000;
+const suggestedFor = new Set();
+setInterval(() => {
+  if (features.get().saverSuggest === false || saverOn || battery.ac || !(battery.life > 0)) return;
+  const now = Date.now();
+  const ev = (calendar.snapshot().events || []).find((e) => e.start > now && e.start - now <= SUGGEST_AHEAD_MS && !suggestedFor.has(e.id));
+  if (!ev || battery.life * 1000 >= ev.end - now) return;
+  suggestedFor.add(ev.id);
+  send('saver-suggest', { title: ev.title, inMin: Math.max(1, Math.round((ev.start - now) / 60000)), life: battery.life });
+}, 60000);
+ipcMain.on('saver-turn-on', (e) => { if (win && e.sender === win.webContents) features.set({ saverNow: true }); });
 const toggleSaver = () => { if (!saverSwitching) features.set({ saverNow: !features.get().saverNow }); };
 let saverNow = features.get().saverNow;
 let saverSwitching = false;
@@ -994,7 +1007,7 @@ features.onChange((f) => {
 // the CPU/RAM poll and the screen capture. The battery saver turns all three on while on battery
 // below its level, without saving them: the user's own choices come back once it ends. It ends
 // on the charger, or 10 % above the level, so it doesn't flip on and off around it.
-let battery = { pct: -1, ac: true };
+let battery = { pct: -1, ac: true, life: -1 };
 let saverOn = false;
 // the saver's notice plays with the animations still on; the saver takes over after it
 let saverQuietUntil = 0;
@@ -1024,6 +1037,7 @@ function saverNotice(payload) {
   if (restartPending) return;
   if (!payload.on && perfNext) Object.assign(payload, { perf: true, hz: perfNext.hz });
   perfNext = null;
+  if (payload.life === undefined) payload.life = battery.ac ? -1 : battery.life;
   if (noticeHeld) { heldNotice = payload; return; }
   saverQuietUntil = Date.now() + 3800;
   applyPerf();
@@ -1078,10 +1092,11 @@ function evalSaver() {
   notifyGeneral();
   return true;
 }
-function onBattery(pct, ac) {
+function onBattery(pct, ac, life = -1) {
+  battery.life = life; // Windows' estimate of the time left on battery, in seconds (-1: unknown / charging)
   if (pct === battery.pct && ac === battery.ac) return;
   const had = battery.pct;
-  battery = { pct, ac };
+  battery = { pct, ac, life };
   evalSaver();
   if ((had < 0) !== (pct < 0)) notifyGeneral();
 }
