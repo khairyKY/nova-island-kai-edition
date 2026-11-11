@@ -907,6 +907,19 @@ const fxGet = () => new Promise((res) => {
   fxWait = (fx) => { clearTimeout(t); fxWait = null; res(fx); };
   mediaWrite('fxget');
 });
+// Windows' hidden Ultimate Performance plan, made from Windows' own template the first time
+const ULTIMATE = 'e9a42b02-d5df-448d-aa00-03f14749eb61';
+const PLAN_GUID = /[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/i;
+async function ultimatePlan() {
+  const list = ((await powercfg(['/list'])) || '').toLowerCase();
+  const made = settings.load('ultimate-plan.json', null)?.guid;
+  if (made && list.includes(made)) return made;
+  const named = list.split('\n').find((l) => l.includes('ultimate performance'))?.match(PLAN_GUID)?.[0];
+  if (named) return named;
+  const guid = (await powercfg(['-duplicatescheme', ULTIMATE]))?.match(PLAN_GUID)?.[0]?.toLowerCase();
+  if (guid) settings.save('ultimate-plan.json', { guid });
+  return guid || null;
+}
 async function pcSaver(on) {
   let saved = settings.load('saver-state.json', null);
   if (on) {
@@ -929,7 +942,8 @@ async function pcSaver(on) {
   } else {
     if (!saved) return;
     await powercfg(['/setdcvalueindex', 'SCHEME_CURRENT', ...ENERGY_SAVER, String(saved.level ?? 0)]);
-    await powercfg(['/setactive', saved.scheme || 'SCHEME_CURRENT']);
+    // switched off, the PC goes all out: Ultimate Performance (the previous plan if Windows won't)
+    await powercfg(['/setactive', (await ultimatePlan()) || saved.scheme || 'SCHEME_CURRENT']);
     if (saved.fx) { mediaWrite('hz 0'); mediaWrite(`anim ${saved.fx.anim}`); mediaWrite(`transp ${saved.fx.transp}`); }
     settings.save('saver-state.json', null);
   }
@@ -955,7 +969,7 @@ features.onChange((f) => {
   if (restart) return;
   // switched by hand: always say so, even when the island's saver was already on (battery low);
   // switched off while the battery is low, the automatic saver keeps it on, and says why
-  if (!evalSaver()) send('saver', { on: saverOn, pct: battery.pct, stays: !saverNow && saverOn, at: f.batterySaverAt });
+  if (!evalSaver()) saverNotice({ on: saverOn, pct: battery.pct, stays: !saverNow && saverOn, at: f.batterySaverAt });
 });
 
 // --- performance options and the battery saver ---
@@ -965,9 +979,18 @@ features.onChange((f) => {
 // on the charger, or 10 % above the level, so it doesn't flip on and off around it.
 let battery = { pct: -1, ac: true };
 let saverOn = false;
+// the saver's notice plays with the animations still on; the saver takes over after it
+let saverQuietUntil = 0;
 function perf() {
   const f = features.get();
-  return { noBlur: f.noBlur || saverOn, noAnimations: f.noAnimations || saverOn, glassFreeze: f.glassFreeze || saverOn };
+  const s = saverOn && Date.now() >= saverQuietUntil;
+  return { noBlur: f.noBlur || s, noAnimations: f.noAnimations || s, glassFreeze: f.glassFreeze || s };
+}
+function saverNotice(payload) {
+  saverQuietUntil = Date.now() + 3800;
+  applyPerf();
+  send('saver', payload);
+  setTimeout(applyPerf, 3850);
 }
 const perfSlow = () => Object.values(perf()).some(Boolean);
 function islandFeatures() {
@@ -1011,8 +1034,7 @@ function evalSaver() {
   if (on === saverOn) return false;
   saverOn = on;
   log.info(`battery saver ${on ? 'on' : 'off'} (${battery.pct}%)`);
-  send('saver', { on, pct: battery.pct });
-  applyPerf();
+  saverNotice({ on, pct: battery.pct });
   notifyGeneral();
   return true;
 }
@@ -1398,7 +1420,8 @@ ipcMain.on('island-ready', () => {
   if (features.get().saverNow && !saverApplied) { saverApplied = true; pcSaver(true).catch(() => {}); }
   // restarted by the battery saver switch (for Graphics > Low): the notice it would have shown
   const notice = process.argv.find((a) => a.startsWith('--saver-notice='));
-  if (notice) setTimeout(() => send('saver', { on: notice.endsWith('on') || saverOn, pct: battery.pct, stays: notice.endsWith('off') && saverOn, at: features.get().batterySaverAt }), 1200);
+  // (switched on, the island's own start shows 'Battery saver is on' already)
+  if (notice?.endsWith('off')) setTimeout(() => saverNotice({ on: saverOn, pct: battery.pct, stays: saverOn, at: features.get().batterySaverAt }), 1200);
 });
 ipcMain.on('update-install', () => updater.install());
 // Settings > General: check now, and "Update now" (the island counts down, as its own card does)
