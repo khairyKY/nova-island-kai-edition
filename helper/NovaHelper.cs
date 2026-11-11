@@ -534,10 +534,25 @@ static class Program {
     foreach (var b in BrowserIds) if (id.Contains(b)) return true;
     return false;
   }
+  // apps that publish a copy of Spotify's own session (Spotifast): two sessions for one song make
+  // the island flip between them (stale progress, the wrong play state, controls sent to the copy),
+  // so while Spotify itself is there the copy is ignored
+  static readonly string[] SpotifyMirrors = { "spotifast" };
+  static bool IsSpotify(string id) {
+    id = (id ?? "").ToLowerInvariant();
+    return id == "spotify.exe" || id.StartsWith("spotifyab.spotifymusic");
+  }
+  static bool IsMirror(string id) {
+    id = (id ?? "").ToLowerInvariant();
+    foreach (var m in SpotifyMirrors) if (id.Contains(m)) return true;
+    return false;
+  }
   static GlobalSystemMediaTransportControlsSession Pick() {
     if (mgr == null) return null;
-    GlobalSystemMediaTransportControlsSession current = null, playing = null, kept = null, app = null;
+    GlobalSystemMediaTransportControlsSession current = null, playing = null, kept = null, app = null, spotify = null;
     try { current = mgr.GetCurrentSession(); } catch { }
+    try { foreach (var x in mgr.GetSessions()) if (IsSpotify(x.SourceAppUserModelId)) { spotify = x; break; } } catch { }
+    if (spotify != null && current != null && IsMirror(current.SourceAppUserModelId)) current = spotify;
     string currentId = current == null ? null : current.SourceAppUserModelId;
     string shownId = shown == null ? null : shown.SourceAppUserModelId;
     var now = DateTime.UtcNow;
@@ -546,6 +561,7 @@ static class Program {
     try {
       foreach (var x in mgr.GetSessions()) {
         string id = x.SourceAppUserModelId ?? "";
+        if (spotify != null && IsMirror(id)) continue;
         seen.Add(id);
         bool on = false;
         try {
