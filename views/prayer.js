@@ -12,7 +12,16 @@
   const bell = $('#pr-alerts');
 
   let data = null;
-  const fired = new Set(); // reminders already shown this run
+  // reminders already shown today, kept across restarts so a restart in the late window doesn't replay one
+  const fired = new Set((() => { try { return JSON.parse(localStorage.getItem('prayer-fired')) || []; } catch { return []; } })());
+  fired.add = function (id) {
+    Set.prototype.add.call(this, id);
+    const today = id.slice(0, 10);
+    try { localStorage.setItem('prayer-fired', JSON.stringify([...this].filter((x) => x.startsWith(today)))); } catch {}
+    return this;
+  };
+  // the PC may wake from sleep (or the island start) a little after the adhan: it still plays then
+  const LATE_MS = 3 * 60000;
 
   // the bell and the Settings window share one switch (prayerAlerts)
   let alertsOn = true;
@@ -102,10 +111,13 @@
   }
 
   function remind(d, now) {
+    // the cached times can arrive while the later views are still loading: wait for the scene
+    // (next tick, a second later) rather than spend the adhan on the plain toast
+    if (!window.playScene) return;
     for (const k of PRAYERS) {
       const diff = at(d.today.date, d.today.times[k]) - now;
       const id = `${d.today.date}-${k}-ev`;
-      if (diff <= 0 && diff > -60000 && !fired.has(id)) {
+      if (diff <= 0 && diff > -LATE_MS && !fired.has(id)) {
         fired.add(id);
         window.dispatchEvent(new CustomEvent('island:adhan', { detail: { prayer: k } }));
       }
@@ -115,7 +127,7 @@
       const t = at(d.today.date, d.today.times[k]);
       const diff = t - now;
       const id = `${d.today.date}-${k}`;
-      if (diff <= 0 && diff > -60000 && !fired.has(`${id}-now`)) {
+      if (diff <= 0 && diff > -LATE_MS && !fired.has(`${id}-now`)) {
         fired.add(`${id}-now`);
         note('🕌', `أذان ${NAMES[k]} ${clock(t)}`);
         chime();
