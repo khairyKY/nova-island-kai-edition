@@ -79,7 +79,9 @@ const GRAPHICS = {
   high: () => { app.commandLine.appendSwitch('disable-gpu-rasterization'); app.commandLine.appendSwitch('num-raster-threads', '1'); },
   veryHigh: () => {},
 };
-const graphics = features.get().graphics;
+// (Battery saver now draws the island on Low too)
+const effGraphics = (f) => (f.saverNow ? 'low' : f.graphics);
+const graphics = effGraphics(features.get());
 (GRAPHICS[graphics] || GRAPHICS.veryHigh)();
 
 const WIN_W = 640;
@@ -628,6 +630,10 @@ function startMedia() {
           apps.onHelper(data);
           continue;
         }
+        if (data.fx) {
+          fxWait?.(data.fx);
+          continue;
+        }
         if (data.windowState) {
           onWindowState(data);
           continue;
@@ -885,29 +891,68 @@ function updateProtection() {
 }
 
 // --- the battery saver switched by hand (Settings, the tray, Ctrl+Alt+B = Pady's 4-finger hold) ---
-// The island's saver below, plus Windows' own Battery saver. Windows has no switch for that one:
-// raising the level it turns on at to 100 % turns it on now while unplugged (it never runs on the
-// charger), and the user's own level is put back when it's switched off.
-const ENERGY_SAVER = ['SCHEME_CURRENT', 'de830923-a562-41af-a086-e3a2c6bad2da', 'e69653ca-cf7f-4f05-aa73-cb833fa90ad4'];
+// The island's saver (below), and for the rest of the PC: Windows' Battery saver, the Balanced
+// power plan, 60 Hz, Windows' animations and transparency off; the island itself draws on
+// Graphics > Low (a restart). What the user had is kept in saver-state.json when it's switched on
+// and put back when it's switched off. The refresh rate is changed for this session only, so a
+// restart of the PC always brings the user's own back.
+const ENERGY_SAVER = ['de830923-a562-41af-a086-e3a2c6bad2da', 'e69653ca-cf7f-4f05-aa73-cb833fa90ad4'];
+const BALANCED = '381b4222-f694-41f0-9685-ff5bb260df2e';
 const powercfg = (args) => new Promise((res) => execFile('powercfg', args, { windowsHide: true }, (err, out) => res(err ? null : String(out))));
-async function windowsSaver(on) {
+// the helper's display / animation / transparency values; it takes commands in order, so the
+// answer also means everything sent before it has been done
+let fxWait = null;
+const fxGet = () => new Promise((res) => {
+  const t = setTimeout(() => { fxWait = null; res(null); }, 2000);
+  fxWait = (fx) => { clearTimeout(t); fxWait = null; res(fx); };
+  mediaWrite('fxget');
+});
+async function pcSaver(on) {
+  let saved = settings.load('saver-state.json', null);
   if (on) {
-    // the level the user had, read before it's raised (the last value is the on-battery one)
-    const values = (await powercfg(['/qh', ...ENERGY_SAVER]))?.match(/0x[0-9a-f]{8}/gi) || [];
-    const level = values.length ? parseInt(values.at(-1), 16) : -1;
-    if (level >= 0 && level < 100) settings.save('saver-level.json', { level });
+    if (!saved) {
+      // what the user has now, kept once (switching on again doesn't overwrite it)
+      const scheme = (await powercfg(['/getactivescheme']))?.match(/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/i)?.[0] || null;
+      saved = { scheme, fx: await fxGet() };
+    }
+    await powercfg(['/setactive', BALANCED]);
+    // Windows' Battery saver has no switch: raising the level it turns on at to 100 % turns it on
+    // now while unplugged (it never runs on the charger). The plan's own level is kept first.
+    if (saved.level == null) {
+      const values = (await powercfg(['/qh', 'SCHEME_CURRENT', ...ENERGY_SAVER]))?.match(/0x[0-9a-f]{8}/gi) || [];
+      saved.level = values.length ? parseInt(values.at(-1), 16) : 0; // the last value is the on-battery one
+    }
+    settings.save('saver-state.json', saved);
+    await powercfg(['/setdcvalueindex', 'SCHEME_CURRENT', ...ENERGY_SAVER, '100']);
+    await powercfg(['/setactive', 'SCHEME_CURRENT']);
+    if (saved.fx) { mediaWrite('hz 60'); mediaWrite('anim 0'); mediaWrite('transp 0'); }
+  } else {
+    if (!saved) return;
+    await powercfg(['/setdcvalueindex', 'SCHEME_CURRENT', ...ENERGY_SAVER, String(saved.level ?? 0)]);
+    await powercfg(['/setactive', saved.scheme || 'SCHEME_CURRENT']);
+    if (saved.fx) { mediaWrite('hz 0'); mediaWrite(`anim ${saved.fx.anim}`); mediaWrite(`transp ${saved.fx.transp}`); }
+    settings.save('saver-state.json', null);
   }
-  const level = on ? 100 : settings.load('saver-level.json', { level: 20 }).level;
-  if ((await powercfg(['/setdcvalueindex', ...ENERGY_SAVER, String(level)])) === null) return log.info('windows battery saver: powercfg failed');
-  await powercfg(['/setactive', 'SCHEME_CURRENT']);
-  log.info(`windows battery saver ${on ? 'on' : 'off'} (turns on at ${level} %)`);
+  await fxGet();
+  log.info(`pc battery saver ${on ? 'on' : 'off'}`);
 }
-const toggleSaver = () => features.set({ saverNow: !features.get().saverNow });
+const toggleSaver = () => { if (!saverSwitching) features.set({ saverNow: !features.get().saverNow }); };
 let saverNow = features.get().saverNow;
+let saverSwitching = false;
+let saverApplied = false; // re-applied once at start, while it's on
 features.onChange((f) => {
   if (f.saverNow === saverNow) return;
   saverNow = f.saverNow;
-  windowsSaver(saverNow);
+  saverSwitching = true;
+  // the island moves to (or back from) Graphics > Low: a restart, once the PC's settings are done,
+  // and the notice is shown after it
+  const restart = effGraphics(f) !== graphics;
+  pcSaver(saverNow).catch((err) => log.info(`pc battery saver: ${err.message}`)).finally(() => {
+    if (!restart) { saverSwitching = false; return; }
+    app.relaunch({ args: [...process.argv.slice(1).filter((a) => !a.startsWith('--saver-notice=')), `--saver-notice=${saverNow ? 'on' : 'off'}`] });
+    app.exit(0);
+  });
+  if (restart) return;
   // switched by hand: always say so, even when the island's saver was already on (battery low);
   // switched off while the battery is low, the automatic saver keeps it on, and says why
   if (!evalSaver()) send('saver', { on: saverOn, pct: battery.pct, stays: !saverNow && saverOn, at: f.batterySaverAt });
@@ -1347,7 +1392,14 @@ function openNovaLink(link) {
   else if (/^https:\/\//.test(link || '')) shell.openExternal(link);
 }
 // the island page reports once all its scripts ran (an early error would stop it before this)
-ipcMain.on('island-ready', () => log.info('island ready'));
+ipcMain.on('island-ready', () => {
+  log.info('island ready');
+  // the saver still on from before (a PC restart brings 60 Hz back to normal): the PC's part again
+  if (features.get().saverNow && !saverApplied) { saverApplied = true; pcSaver(true).catch(() => {}); }
+  // restarted by the battery saver switch (for Graphics > Low): the notice it would have shown
+  const notice = process.argv.find((a) => a.startsWith('--saver-notice='));
+  if (notice) setTimeout(() => send('saver', { on: notice.endsWith('on') || saverOn, pct: battery.pct, stays: notice.endsWith('off') && saverOn, at: features.get().batterySaverAt }), 1200);
+});
 ipcMain.on('update-install', () => updater.install());
 // Settings > General: check now, and "Update now" (the island counts down, as its own card does)
 ipcMain.handle('update-check', () => updater.checkNow());
@@ -1483,7 +1535,8 @@ let autoUpdate = features.get().autoUpdate;
 let newsOn = features.get().news;
 features.onChange((f) => {
   // the graphics switches only take effect at launch
-  if (f.graphics !== graphics) {
+  // (the battery saver restarts it itself, once the PC's settings are switched)
+  if (effGraphics(f) !== graphics && !saverSwitching) {
     app.relaunch();
     app.exit(0);
     return;

@@ -683,6 +683,11 @@ static class Program {
     }
     Match m;
     if (cmd.StartsWith("focusapp	") || cmd.StartsWith("runningapps	")) { AppCommand(cmd); return; }
+    // Battery saver now (Saver.cs)
+    if (cmd == "fxget") { outw.WriteLine(Saver.Get()); return; }
+    if (cmd.StartsWith("hz ")) { int hz; if (int.TryParse(cmd.Substring(3), out hz)) Saver.Hz(hz); return; }
+    if (cmd.StartsWith("anim ")) { Saver.Anim(cmd.EndsWith("1")); return; }
+    if (cmd.StartsWith("transp ")) { Saver.Transp(cmd.EndsWith("1")); return; }
     if ((m = AppCmd.Match(cmd)).Success) {
       var t = Find(m.Groups[2].Value);
       if (t != null) Await(m.Groups[1].Value == "pauseapp" ? t.TryPauseAsync() : t.TryPlayAsync());
