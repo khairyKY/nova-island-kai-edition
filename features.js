@@ -15,6 +15,8 @@ const DEFAULTS = {
   slideClock: true,
   slideStats: true,
   slidePrayer: true,
+  slideGlucose: true, // Sukoon's glucose, once signed in (Settings > Connections)
+  glucoseAlerts: true, // Sukoon: going low, urgent low, heading low, high, back in range, no signal
   // live activities
   mediaPill: true,
   mediaTitle: true,

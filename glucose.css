@@ -1,0 +1,154 @@
+/* Sukoon's glucose on the island (views/glucose.js): the collapsed slide and the state notices.
+   Colours: in range green, high amber, low coral, urgent red, no signal grey. */
+/* Sukoon's own palette (sukoon ui/theme/Color.kt, web/index.html): sage in range, amber high, one
+   coral-red for low and urgent low (Sukoon tells them apart by words, not a second shade), the warm
+   neutral for no signal. Its dark-theme tones on a dark island, its light ones on a light theme. */
+body { --sk-ok: 130, 187, 160; --sk-high: 229, 184, 119; --sk-low: 240, 160, 151; --sk-gone: 163, 154, 139; --sk-alarm: 201, 86, 75; }
+body:is([data-theme="kai-day"], [data-theme="kai-fern-day"], [data-theme="retro"], [data-theme="nody"]) {
+  --sk-ok: 62, 122, 99; --sk-high: 138, 90, 30; --sk-low: 162, 63, 53; --sk-gone: 138, 130, 117; }
+.gl-slide, .l-toast[class*=' gl-'] { --gl: var(--sk-ok); }
+.gl-slide[data-kind='high'], .l-toast:is(.gl-high, .gl-heading) { --gl: var(--sk-high); }
+.gl-slide:is([data-kind='low'], [data-kind='urgent']), .l-toast:is(.gl-low, .gl-urgent) { --gl: var(--sk-low); }
+.gl-slide[data-kind='gone'], .l-toast.gl-gone { --gl: var(--sk-gone); }
+
+/* ---- the odometer number: each digit a column 0-9 sliding to its place, left to right ---- */
+.gl-num { display: inline-flex; line-height: 1; height: 1em; overflow: hidden; }
+.gl-d { display: inline-block; height: 1em; overflow: hidden; }
+.gl-col { display: flex; flex-direction: column; transform: translateY(calc(var(--n, 0) * -1em));
+  transition: transform .9s cubic-bezier(.2, .9, .25, 1.04) calc(var(--i, 0) * 70ms); }
+.gl-col i { display: block; height: 1em; font-style: normal; text-align: center; }
+.gl-snap .gl-col { transition: none; }
+
+/* the trend arrow turns smoothly to the new trend, with a little overshoot */
+.gl-arrow { width: 14px; height: 14px; color: rgb(var(--gl)); transform: rotate(var(--rot, 0deg));
+  transition: transform .8s cubic-bezier(.3, 1.5, .5, 1), opacity .3s; }
+.gl-arrow.gone { opacity: 0; }
+
+/* ---- the slide ---- */
+.gl-slide .i-strong { color: rgb(var(--gl)); font-size: 14px; transition: color .6s ease; }
+.gl-unit { font-size: 10px; }
+.gl-who { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gl-who:empty { display: none; }
+.gl-live { position: relative; width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--gl)); flex: none; transition: background .6s; }
+.gl-live::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: rgb(var(--gl));
+  animation: gl-ping 2.4s cubic-bezier(0, 0, .2, 1) infinite; }
+@keyframes gl-ping { 0% { transform: scale(1); opacity: .7; } 70%, 100% { transform: scale(2.8); opacity: 0; } }
+.gl-slide[data-kind='gone'] .gl-live::after { animation: none; }
+.gl-slide[data-kind='urgent'] .gl-live::after { animation-duration: .9s; }
+.gl-slide[data-kind='low'] .gl-live::after { animation-duration: 1.4s; }
+/* urgent: the number glows on a heartbeat */
+.gl-slide[data-kind='urgent'] .gl-num { animation: gl-throb 1.1s ease-in-out infinite; }
+@keyframes gl-throb { 0%, 100% { text-shadow: 0 0 0 transparent; } 15%, 45% { text-shadow: 0 0 8px rgba(var(--sk-alarm), .95); } 30% { text-shadow: 0 0 2px rgba(var(--sk-alarm), .4); } }
+.gl-slide[data-kind='gone'] .gl-num { opacity: .55; }
+
+/* the sparkline: the 70-180 band faintly behind, the line draws itself on a new reading */
+.gl-spark { width: 56px; height: 16px; overflow: visible; }
+.gl-spark.empty { display: none; }
+.gl-band { fill: rgba(255, 255, 255, .07); }
+.gl-line { fill: none; stroke: rgb(var(--gl)); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0;
+  vector-effect: non-scaling-stroke; transition: stroke .6s; }
+.gl-spark.draw .gl-line { animation: gl-draw 1.1s cubic-bezier(.4, 0, .2, 1) both; }
+@keyframes gl-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.gl-end { fill: rgb(var(--gl)); filter: drop-shadow(0 0 2px rgba(var(--gl), .9)); }
+.gl-spark.draw .gl-end { animation: gl-pop .5s cubic-bezier(.3, 1.8, .5, 1) .95s both; }
+@keyframes gl-pop { from { r: 0; } to { r: 1.8px; } }
+
+/* ======== the notices ======== */
+.l-toast[class*=' gl-'] { isolation: isolate; }
+.l-toast[class*=' gl-'] .ico-drop { display: block; color: rgb(var(--gl)); filter: drop-shadow(0 0 4px rgba(var(--gl), .7)); }
+.l-toast[class*=' gl-'] .batt, .l-vtoast[class*=' gl-'] .v-bar { display: none; }
+.l-toast[class*=' gl-'] #t-value { display: inline-flex; align-items: center; gap: 3px; color: rgb(var(--gl)); font-weight: 700; font-variant-numeric: tabular-nums; }
+.l-toast.gl-gone #t-value { color: rgba(255, 255, 255, .55); font-weight: 500; }
+.l-toast[class*=' gl-'] .t-speed { display: block; position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.l-toast[class*=' gl-'] :is(#t-label, #t-value) { animation: fx-drop-in .5s cubic-bezier(.3, 1.5, .5, 1) .05s both; }
+.l-toast[class*=' gl-'] #t-value { animation-delay: .15s; }
+
+/* going low: a drop falls into the pill and ripples out */
+.l-toast.gl-low .ico-drop { animation: gl-fall .7s cubic-bezier(.5, 0, .75, .3) both, gl-squash .35s ease-out .7s; }
+@keyframes gl-fall { from { transform: translateY(-22px) scale(.6); opacity: 0; } 60% { opacity: 1; } to { transform: none; } }
+@keyframes gl-squash { 40% { transform: scale(1.25, .75); } }
+.l-toast.gl-low .t-speed::before { content: ''; position: absolute; left: 22px; top: 50%; width: 10px; height: 10px; margin: -5px;
+  border-radius: 50%; border: 2px solid rgba(var(--gl), .9); animation: gl-ripple 1s cubic-bezier(.2, .7, .3, 1) .7s both; }
+.l-toast.gl-low .t-speed::after { content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 22px 50%, rgba(var(--gl), .38), transparent 60%); animation: gl-wash 1.4s ease-out .65s both; }
+@keyframes gl-ripple { from { transform: scale(.3); opacity: 1; } to { transform: scale(14); opacity: 0; } }
+@keyframes gl-wash { from { opacity: 0; } 25% { opacity: 1; } to { opacity: 0; } }
+#island.fx-gl-low .clip { animation: gl-beat-ring 1.2s cubic-bezier(.2, .7, .3, 1) .6s; }
+@keyframes gl-beat-ring {
+  0% { box-shadow: 0 0 0 0 rgba(var(--sk-alarm), .9); }
+  30% { box-shadow: 0 0 0 3px rgba(var(--sk-alarm), .7), 0 0 18px 4px rgba(var(--sk-alarm), .4); }
+  100% { box-shadow: 0 0 0 14px rgba(var(--sk-alarm), 0); }
+}
+
+/* urgent low: red flashes, a shiver, and a heartbeat ring that keeps beating while it's up */
+.l-toast.gl-urgent .t-speed { animation: gl-alarm 1.2s ease-out both; }
+@keyframes gl-alarm {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(var(--sk-alarm), 0); }
+  10%, 40% { box-shadow: inset 0 0 18px 30px rgba(var(--sk-alarm), .42); }
+  25%, 60% { box-shadow: inset 0 0 0 0 rgba(var(--sk-alarm), .05); }
+}
+.l-toast.gl-urgent .ico-drop { animation: gl-beat 1.1s ease-in-out infinite; }
+@keyframes gl-beat { 0%, 100% { transform: scale(1); } 14% { transform: scale(1.28); } 28% { transform: scale(1); } 42% { transform: scale(1.18); } }
+.l-toast.gl-urgent #t-label { font-weight: 800; letter-spacing: .02em; }
+#island.toast.fx-gl-urgent .clip { animation: fx-shiver .5s linear, gl-ring 1.1s cubic-bezier(.2, .7, .3, 1) .5s infinite; }
+@keyframes gl-ring {
+  0% { box-shadow: 0 0 0 0 rgba(var(--sk-alarm), .9); }
+  14% { box-shadow: 0 0 0 3px rgba(var(--sk-alarm), .75), 0 0 18px 4px rgba(var(--sk-alarm), .45); }
+  42% { box-shadow: 0 0 0 2px rgba(var(--sk-alarm), .6), 0 0 14px 3px rgba(var(--sk-alarm), .3); }
+  100% { box-shadow: 0 0 0 14px rgba(var(--sk-alarm), 0), 0 0 22px 8px rgba(var(--sk-alarm), 0); }
+}
+
+/* heading low: chevrons slide down through the pill, the arrow bobs downward */
+.l-toast.gl-heading .t-speed::before { content: ''; position: absolute; inset: -60% 0 0 0;
+  background: repeating-linear-gradient(180deg, transparent 0 10px, rgba(var(--gl), .16) 10px 12px, transparent 12px 20px);
+  -webkit-mask: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent); animation: gl-slide-down 1.8s linear both; }
+@keyframes gl-slide-down { from { transform: translateY(-20px); opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } to { transform: translateY(40px); opacity: 0; } }
+.l-toast.gl-heading .gl-arrow { animation: gl-bob-down .7s ease-in-out .9s 3; }
+@keyframes gl-bob-down { 50% { translate: 0 3px; } }
+.l-toast.gl-heading .ico-drop { animation: gl-sway 1.8s ease-in-out both; transform-origin: 50% 0; }
+@keyframes gl-sway { 20% { rotate: -12deg; } 50% { rotate: 9deg; } 75% { rotate: -4deg; } }
+
+/* high: a warm glow rises from the bottom, bubbles float up */
+.l-toast.gl-high .t-speed::before { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(0deg, rgba(var(--gl), .4), transparent 70%); animation: gl-rise 1.6s ease-out both; }
+@keyframes gl-rise { from { transform: translateY(100%); opacity: 0; } 35% { opacity: 1; } to { transform: translateY(-30%); opacity: 0; } }
+.l-toast.gl-high .t-speed::after { content: ''; position: absolute; inset: 0;
+  background:
+    radial-gradient(circle, rgba(var(--gl), .9) 0 1.5px, transparent 2px) 18% 100% / 8px 8px no-repeat,
+    radial-gradient(circle, rgba(var(--gl), .8) 0 1px, transparent 1.5px) 38% 100% / 6px 6px no-repeat,
+    radial-gradient(circle, rgba(var(--gl), .9) 0 2px, transparent 2.5px) 62% 100% / 8px 8px no-repeat,
+    radial-gradient(circle, rgba(var(--gl), .7) 0 1px, transparent 1.5px) 82% 100% / 6px 6px no-repeat;
+  animation: gl-bubbles 1.5s cubic-bezier(.3, 0, .5, 1) .1s both; }
+@keyframes gl-bubbles { from { transform: translateY(10px); opacity: 0; } 25% { opacity: 1; } to { transform: translateY(-34px); opacity: 0; } }
+.l-toast.gl-high .gl-arrow { animation: gl-bob-up .7s ease-in-out .9s 2; }
+@keyframes gl-bob-up { 50% { translate: 0 -3px; } }
+
+/* back in range: relief. A soft green bloom from the drop, one calm ring outward */
+.l-toast.gl-inrange .t-speed::before { content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 22px 50%, rgba(var(--gl), .45), transparent 55%); animation: gl-bloom 1.6s ease-out both; }
+@keyframes gl-bloom { from { transform: scale(.3); transform-origin: 22px 50%; opacity: 0; } 30% { opacity: 1; } to { transform: scale(2.2); transform-origin: 22px 50%; opacity: 0; } }
+.l-toast.gl-inrange .ico-drop { animation: gl-exhale 1.2s cubic-bezier(.3, 1.4, .5, 1) both; }
+@keyframes gl-exhale { from { transform: scale(.4); opacity: 0; } 45% { transform: scale(1.2); opacity: 1; } to { transform: none; } }
+#island.fx-gl-inrange .clip { animation: gl-relief 1.4s cubic-bezier(.2, .7, .3, 1) .2s; }
+@keyframes gl-relief {
+  0% { box-shadow: 0 0 0 0 rgba(var(--sk-ok), 0); }
+  35% { box-shadow: 0 0 0 2px rgba(var(--sk-ok), .85), 0 0 22px 5px rgba(var(--sk-ok), .5); }
+  100% { box-shadow: 0 0 0 16px rgba(var(--sk-ok), 0), 0 0 26px 8px rgba(var(--sk-ok), 0); }
+}
+
+/* no signal: the drop flickers out and back like a lost connection, a grey static sweep */
+.l-toast.gl-gone .ico-drop { animation: gl-flicker 1.2s steps(1, end) both; filter: none; }
+@keyframes gl-flicker { 0%, 22%, 48%, 70% { opacity: 1; } 12%, 34%, 58% { opacity: .15; } 100% { opacity: .6; } }
+.l-toast.gl-gone .t-speed::before { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .12), transparent) -60% 0 / 40% 100% no-repeat; animation: fx-sweep 1.1s ease-in-out .1s both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-col, .gl-arrow { transition: none; }
+  .gl-live::after, .gl-slide .gl-num, .l-toast[class*=' gl-'] *, .l-toast[class*=' gl-'] .t-speed::before, .l-toast[class*=' gl-'] .t-speed::after, #island[class*='fx-gl-'] .clip { animation: none !important; }
+}
+
+/* room for the label and the number (renderer.js WIDE_TOASTS) */
+#island.toast:not(.vertical):is([data-wide-toast="gl-low"], [data-wide-toast="gl-urgent"], [data-wide-toast="gl-gone"]) { --w: 380px; }
+#island.toast:not(.vertical)[data-wide-toast="gl-heading"] { --w: 430px; }
+#island.toast:not(.vertical)[data-wide-toast="gl-high"] { --w: 360px; }
+#island.toast:not(.vertical)[data-wide-toast="gl-inrange"] { --w: 400px; }

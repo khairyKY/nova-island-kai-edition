@@ -122,6 +122,7 @@
             <div class="row previews"><b>Notices</b><div class="preview-btns"><button class="btn" data-preview="pady-drop">Pady drop</button><button class="btn" data-preview="app-notice">App notice</button><button class="btn" data-preview="kai-notice">Kai’s Flow</button><button class="btn" data-preview="volume">Volume</button><button class="btn" data-preview="brightness">Brightness</button></div></div>
             <div class="row previews"><b>Power</b><div class="preview-btns"><button class="btn" data-preview="saver-on">Battery saver on</button><button class="btn" data-preview="saver-stays">Saver stays on</button><button class="btn" data-preview="saver-off">Saver off</button><button class="btn" data-preview="saver-suggest">Saver suggestion</button><button class="btn" data-preview="performance">Performance mode</button><button class="btn" data-preview="charging">Charging</button><button class="btn" data-preview="low-battery">Low battery</button><button class="btn" data-preview="on-battery">On battery</button></div></div>
             <div class="row previews"><b>Companion</b><div class="preview-btns"><button class="btn" data-preview="adhan">Adhan</button><button class="btn" data-preview="water">Water</button><button class="btn" data-preview="focus">Focus</button><button class="btn" data-preview="focus-done">Focus done</button><button class="btn" data-preview="celebration">Celebration</button></div></div>
+            <div class="row previews"><b>Sukoon</b><div class="preview-btns"><button class="btn" data-preview="gl-slide">Glucose pill</button><button class="btn" data-preview="gl-low">Going low</button><button class="btn" data-preview="gl-urgent">Urgent low</button><button class="btn" data-preview="gl-heading">Heading low</button><button class="btn" data-preview="gl-high">High</button><button class="btn" data-preview="gl-inrange">Back in range</button><button class="btn" data-preview="gl-gone">No signal</button></div></div>
           </div>
           <p class="hint">Plays on the island now, from made-up data: nothing is switched and no song changes</p>
         </div>
@@ -359,6 +360,21 @@
       <!-- CONNECTIONS -->
       <section id="connections" class="page">
         <h1>Connections</h1>
+        <div class="group">
+          <h2>Sukoon</h2>
+          <div class="card">
+            <div class="row"><div class="txt"><b>Glucose</b><small id="sk-status">Checking…</small></div><button class="btn" id="sk-out" hidden>Sign out</button></div>
+            <form class="row field" id="sk-form" hidden>
+              <input type="email" id="sk-email" placeholder="Sukoon email" autocomplete="username" spellcheck="false">
+              <input type="password" id="sk-pass" placeholder="Password" autocomplete="current-password">
+              <button class="btn" id="sk-in">Sign in</button>
+            </form>
+            <div class="row" id="sk-who-row" hidden><b>Show</b><select id="sk-who" class="select"></select></div>
+            <label class="row" data-sk-on hidden><div class="txt"><b>In the collapsed island</b><small>The reading, its arrow and the last three hours</small></div><input type="checkbox" class="sw" data-feature="slideGlucose"></label>
+            <label class="row" data-sk-on hidden><div class="txt"><b>Alerts</b><small>Going low, urgent low, heading low, high, back in range, no signal</small></div><input type="checkbox" class="sw" data-feature="glucoseAlerts"></label>
+          </div>
+          <p class="hint">The island reads the readings your phone shares with Sukoon, once a minute. Your password isn’t kept, only a sign-in token, encrypted by Windows.</p>
+        </div>
         <div class="group">
           <h2>Calendar</h2>
           <div class="card">

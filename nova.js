@@ -44,6 +44,7 @@ const plugins = require('./plugins');
 const { createBrowserBridge } = require('./browser-media');
 const { resolve: resolveMediaSource } = require('./media-sources');
 const { createSpotify } = require('./spotify');
+const { createSukoon } = require('./sukoon');
 const { stripBackdrop } = require('./backdrop');
 const browserCompanion = require('./browser-companion-setup');
 const { createNoticeBridge, appNotice } = require('./kai-notices');
@@ -1448,6 +1449,13 @@ function notifyGeneral() {
 }
 ipcMain.on('open-settings', (_e, page) => prefsWindow.open(['island', 'whats-new'].includes(page) ? page : undefined));
 const mediaSettingsSender = e => (win && e.sender === win.webContents) || prefsWindow.owns(e.sender);
+// Sukoon: the island only reads glucose; signing in (Kai types it) happens in Settings
+let sukoon = null;
+ipcMain.handle('sukoon-status', e => mediaSettingsSender(e) ? sukoon?.status() || {connected:false} : null);
+ipcMain.handle('sukoon-sign-in', (e, email, password) => prefsWindow.owns(e.sender) && typeof email === 'string' && typeof password === 'string'
+  ? sukoon?.signIn(email.trim().slice(0, 200), password.slice(0, 200)) : {ok:false});
+ipcMain.handle('sukoon-sign-out', e => { if (prefsWindow.owns(e.sender)) sukoon?.signOut(); });
+ipcMain.handle('sukoon-choose', (e, id) => prefsWindow.owns(e.sender) && typeof id === 'string' ? sukoon?.choose(id) : null);
 ipcMain.handle('spotify-status', e => mediaSettingsSender(e) ? spotify?.snapshot() || {connected:false} : null);
 ipcMain.handle('spotify-connect', (e, clientId) => mediaSettingsSender(e) ? spotify?.connect(clientId) : {ok:false});
 ipcMain.handle('spotify-disconnect', e => { if (mediaSettingsSender(e)) spotify?.disconnect(); });
@@ -1750,6 +1758,13 @@ app.whenReady().then(() => {
     return safeStorage.encryptString(value);
   }, decrypt:bytes => safeStorage.decryptString(bytes), openExternal:url => shell.openExternal(url),
   onChange:value => { send('spotify',value); prefsWindow.send('spotify',value); }});
+  sukoon = createSukoon({store:settings, encrypt:value => {
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows could not securely store your Sukoon sign-in.');
+    return safeStorage.encryptString(value);
+  }, decrypt:bytes => safeStorage.decryptString(bytes), log:m => log.info(m),
+  onChange:value => { send('sukoon',value); prefsWindow.send('sukoon',value); },
+  onEvent:e => { if (features.get().glucoseAlerts !== false) send('sukoon-alert',e); }});
+  sukoon.start();
   browserMedia.start();
   if (app.isPackaged) browserCompanion.prepare(app.getPath('userData'),scriptPath(path.join('helper','browser-media-host.exe')))
     .catch(err => log.info(`[browser-companion] ${err.code || 'setup unavailable'}`));

@@ -73,6 +73,13 @@
       });
       window.celebrate?.(['#ff6b6b', '#ffd479', '#ff9f0a']);
     },
+    'gl-slide': () => window.glucosePreview?.('slide'),
+    'gl-low': () => window.glucosePreview?.('low'),
+    'gl-urgent': () => window.glucosePreview?.('urgent'),
+    'gl-heading': () => window.glucosePreview?.('heading'),
+    'gl-high': () => window.glucosePreview?.('high'),
+    'gl-inrange': () => window.glucosePreview?.('inrange'),
+    'gl-gone': () => window.glucosePreview?.('gone'),
     celebration: () => {
       window.playScene?.({ who: 'nova', phoenixPose: 'celebration', badge: 'Celebration', title: 'Nicely done!', tone: 'gold', ms: 3500 });
       window.celebrate?.(['#38bdf8', '#a5f3fc', '#ffd479']);

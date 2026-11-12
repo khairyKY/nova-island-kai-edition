@@ -310,7 +310,7 @@ const DIMS = {
 };
 const COMPACT_WIDE = 380; // compact with a title (media / download)
 // notices with more to say than the 340 px pill holds (battery time left, the saver suggestion)
-const WIDE_TOASTS = { saver: 400, 'saver-stays': 400, 'saver-off': 400, perf: 400, battery: 380, low: 380, suggest: 470 };
+const WIDE_TOASTS = { saver: 400, 'saver-stays': 400, 'saver-off': 400, perf: 400, battery: 380, low: 380, suggest: 470, 'gl-low': 380, 'gl-urgent': 380, 'gl-heading': 430, 'gl-high': 360, 'gl-inrange': 400, 'gl-gone': 380 };
 const VDIMS = { ...DIMS, idle: [44, 244], compact: [44, 136], toast: [44, 168] };
 let anchor = { x: window.innerWidth / 2, y: 8, docked: false, vertical: false, side: 'right' };
 
@@ -575,6 +575,9 @@ setInterval(() => {
 function showSlide(n) {
   const all = [...$$('.info-slide')];
   let slides = all.filter((s) => !s.hidden && !s.classList.contains('off'));
+  // a pinned slide (Sukoon's glucose while low) stays in front
+  const pinned = slides.find((s) => s.classList.contains('pin'));
+  if (pinned) slides = [pinned];
   if (!slides.length) slides = [all[0]];
   infoSlide = n % slides.length;
   all.forEach((s) => s.classList.toggle('on', s === slides[infoSlide]));
@@ -1230,7 +1233,7 @@ function dismissToast() {
   window.dispatchEvent(new Event('island:toast-end'));
 }
 // notices with their own animation around the island (style-2.css): the class plays it once
-const TOAST_FX = { perf: 1500, saver: 1600, 'saver-stays': 1500, 'saver-off': 1100, charging: 1400, low: 1400, battery: 1000 };
+const TOAST_FX = { 'gl-low': 1400, 'gl-urgent': 60000, 'gl-heading': 1800, 'gl-high': 1600, 'gl-inrange': 1600, 'gl-gone': 1200, perf: 1500, saver: 1600, 'saver-stays': 1500, 'saver-off': 1100, charging: 1400, low: 1400, battery: 1000 };
 let toastFxTimer = 0;
 function toastFx(kind) {
   const cls = kind === 'perf' ? 'perf-burst' : `fx-${kind}`;

@@ -56,7 +56,8 @@
       "!assets/zaher-v1/*.png",
       "!assets/zaher-v1/generation.json",
       "!assets/*-v1/*.png",
-      "!assets/*-v1/generation.json"
+      "!assets/*-v1/generation.json",
+      "!assets/phoenix-anim-v2/**"
     ],
     "publish": {
       "provider": "github",
