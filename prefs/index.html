@@ -363,17 +363,15 @@
         <div class="group">
           <h2>Sukoon</h2>
           <div class="card">
-            <div class="row"><div class="txt"><b>Glucose</b><small id="sk-status">Checking…</small></div><button class="btn" id="sk-out" hidden>Sign out</button></div>
+            <div class="row"><div class="txt"><b>Glucose</b><small id="sk-status">Checking…</small></div><button class="btn" id="sk-out" hidden>Disconnect</button></div>
             <form class="row field" id="sk-form" hidden>
-              <input type="email" id="sk-email" placeholder="Sukoon email" autocomplete="username" spellcheck="false">
-              <input type="password" id="sk-pass" placeholder="Password" autocomplete="current-password">
-              <button class="btn" id="sk-in">Sign in</button>
+              <input type="text" id="sk-link" placeholder="Sukoon Widget link" spellcheck="false" autocomplete="off">
+              <button class="btn" id="sk-in">Connect</button>
             </form>
-            <div class="row" id="sk-who-row" hidden><b>Show</b><select id="sk-who" class="select"></select></div>
             <label class="row" data-sk-on hidden><div class="txt"><b>In the collapsed island</b><small>The reading, its arrow and the last three hours</small></div><input type="checkbox" class="sw" data-feature="slideGlucose"></label>
             <label class="row" data-sk-on hidden><div class="txt"><b>Alerts</b><small>Going low, urgent low, heading low, high, back in range, no signal</small></div><input type="checkbox" class="sw" data-feature="glucoseAlerts"></label>
           </div>
-          <p class="hint">The island reads the readings your phone shares with Sukoon, once a minute. Your password isn’t kept, only a sign-in token, encrypted by Windows.</p>
+          <p class="hint">In Sukoon: Settings › Widget link. It’s the same link as the Rainmeter widget (the island picks that one up by itself). It can only read your glucose, and it’s kept encrypted by Windows.</p>
         </div>
         <div class="group">
           <h2>Calendar</h2>

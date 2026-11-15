@@ -32,35 +32,30 @@ $('#spotify-connect').addEventListener('click', async () => {
 $('#spotify-disconnect').addEventListener('click', () => api.disconnectSpotify());
 $('#spotify-dashboard').addEventListener('click', () => api.spotifyDashboard());
 
-// Sukoon: sign in once (the password goes straight to Sukoon, only its token is kept)
+// Sukoon: its Widget link (read-only; the same one the Rainmeter widget uses)
 const SK_KIND = { ok: 'in range', low: 'low', urgent: 'urgent low', high: 'high', gone: 'no signal', none: 'no readings yet' };
 function showSukoon(s) {
   s = s || {};
   const g = s.glucose;
-  $('#sk-status').textContent = s.error || (!s.connected ? 'Sign in with your Sukoon account to see your glucose on the island'
-    : g && g.kind !== 'none' && g.v ? `${s.email} · ${g.v} mg/dL, ${SK_KIND[g.kind]}, ${g.minutes ? `${g.minutes} min ago` : 'now'}`
-    : `${s.email} · ${SK_KIND[g?.kind] || 'connecting…'}`);
-  $('#sk-form').hidden = !!s.connected;
+  $('#sk-status').textContent = s.error || (!s.connected ? 'Paste your Sukoon Widget link to see your glucose on the island'
+    : g && g.kind !== 'none' && g.v ? `Connected · ${g.v} mg/dL, ${SK_KIND[g.kind]}, ${g.minutes ? `${g.minutes} min ago` : 'now'}`
+    : `Connected · ${SK_KIND[g?.kind] || 'reading…'}`);
+  $('#sk-form').hidden = !!s.connected && !s.error;
   $('#sk-out').hidden = !s.connected;
   $$('[data-sk-on]').forEach((r) => { r.hidden = !s.connected; });
-  const people = s.people || [];
-  $('#sk-who-row').hidden = !s.connected || people.length < 2;
-  $('#sk-who').innerHTML = people.map((p) => `<option value="${esc(p.id)}">${p.self ? 'Me' : esc(p.name)}</option>`).join('');
-  $('#sk-who').value = s.chosen || '';
 }
 api.sukoonStatus().then(showSukoon);
 api.onSukoon(showSukoon);
 $('#sk-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('#sk-in').disabled = true;
-  $('#sk-status').textContent = 'Signing in…';
-  const r = await api.sukoonSignIn($('#sk-email').value, $('#sk-pass').value);
-  $('#sk-pass').value = '';
+  $('#sk-status').textContent = 'Connecting…';
+  const r = await api.sukoonLink($('#sk-link').value);
   $('#sk-in').disabled = false;
-  if (!r?.ok) $('#sk-status').textContent = r?.error || 'Could not sign in.';
+  if (r?.ok) $('#sk-link').value = '';
+  else $('#sk-status').textContent = r?.error || 'Could not connect.';
 });
 $('#sk-out').addEventListener('click', () => api.sukoonSignOut());
-$('#sk-who').addEventListener('change', (e) => api.sukoonChoose(e.target.value));
 api.browserCompanionStatus().then(value => {
   $('#browser-companion-status').textContent = value?.connected ? 'Connected · playing sites can identify themselves' : 'Load the companion once to show YouTube and other site icons';
 });

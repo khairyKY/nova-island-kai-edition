@@ -1,73 +1,53 @@
-// Sukoon (Kai's glucose app for the Libre 2): the island follows the readings the way Sukoon's own
-// follow page does. The phone writes each reading to Sukoon's Supabase project; signed in here, the
-// island reads its own (or a followed person's) readings once a minute, works out the state with the
-// app's own lines (urgent < 55, low < 70, high > 180, no reading for 10 min = no signal, and where
-// the last 15 minutes point in 20 more), and tells the island the state and when it changes.
-// Only Supabase's refresh token is kept (encrypted with Windows' own store), never the password.
+// Sukoon (Kai's glucose app for the Libre 2): the island follows the readings through Sukoon's Widget
+// link, the same read-only Nightscout feed the Rainmeter glass widget uses: no password, only the
+// link's token (kept encrypted by Windows). Once a minute it reads the last three hours, works out the
+// state with Sukoon's own lines (urgent < 55, low < 70, high > 180, no reading for 10 min = no signal,
+// and where the last 15 minutes point in 20 more), and tells the island the state and when it changes.
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
-// Sukoon's project and its publishable key: public by design, row-level security decides who can
-// read what (the same as web/config.js in the Sukoon repo)
-const URL_BASE = 'https://xfanobficweqlhklsllg.supabase.co';
-const KEY = 'sb_publishable_XyER7uPkJ6un8VmAzgqNIg_2p6cjmDw';
+const FEED = 'https://xfanobficweqlhklsllg.supabase.co/functions/v1/nightscout';
 const POLL_MS = 60 * 1000;
 const FRESH_MIN = 10;
+// Nightscout directions -> Sukoon's trend -2..2
+const TREND = { DoubleUp: 2, SingleUp: 2, FortyFiveUp: 1, Flat: 0, FortyFiveDown: -1, SingleDown: -2, DoubleDown: -2 };
+
+// a pasted full link works too: keep only the token
+const tokenOf = (s) => (String(s || '').match(/token=([0-9a-f]{32,})/i) || String(s || '').trim().match(/^([0-9a-f]{32,})$/i) || [])[1] || '';
+
+// the Rainmeter widget's link, when it's set up on this PC: the island can start from it
+function rainmeterToken() {
+  const roots = [path.join(os.homedir(), 'OneDrive', 'Documents'), path.join(os.homedir(), 'Documents')];
+  for (const r of roots) {
+    try {
+      const ini = fs.readFileSync(path.join(r, 'Rainmeter', 'Skins', 'Glass', 'Sukoon', 'Sukoon.ini'), 'utf8');
+      const t = tokenOf((ini.match(/^\s*Token\s*=\s*(.+)$/m) || [])[1]);
+      if (t) return t;
+    } catch {}
+  }
+  return '';
+}
 
 function createSukoon({ store, encrypt, decrypt, onChange = () => {}, onEvent = () => {}, log = () => {}, request = globalThis.fetch }) {
-  let session = null; // { access, refresh, expires, user, email }
-  let people = [];    // [{ id, name, self }]
-  let chosen = null;  // the person whose glucose the island shows
+  let token = '';
   let snapshot = null, error = '', timer = null, lastKind = null, lastHeading = false;
   try {
     const saved = store.load('sukoon.json', {});
-    if (saved.secret) session = JSON.parse(decrypt(Buffer.from(saved.secret, 'base64')));
-    chosen = saved.chosen || null;
-  } catch { session = null; }
+    if (saved.secret) token = decrypt(Buffer.from(saved.secret, 'base64'));
+  } catch { token = ''; }
 
   function persist() {
-    store.save('sukoon.json', { secret: session ? encrypt(JSON.stringify(session)).toString('base64') : '', chosen });
+    store.save('sukoon.json', { secret: token ? encrypt(token).toString('base64') : '' });
   }
-  async function call(path, { method = 'GET', body, auth = true } = {}) {
-    const headers = { apikey: KEY, 'Content-Type': 'application/json' };
-    if (auth && session) headers.Authorization = `Bearer ${session.access}`;
-    const res = await request(URL_BASE + path, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(12000) });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) { const e = new Error(json.msg || json.error_description || json.message || `HTTP ${res.status}`); e.status = res.status; throw e; }
-    return json;
-  }
-  function keep(json, email) {
-    session = { access: json.access_token, refresh: json.refresh_token, expires: Date.now() + (json.expires_in || 3600) * 1000, user: json.user?.id || session?.user, email: email || json.user?.email || session?.email };
-    persist();
-  }
-  async function fresh() {
-    if (session && Date.now() > session.expires - 120000) {
-      keep(await call('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh }, auth: false }));
-    }
-  }
-
-  async function loadPeople() {
-    const me = { id: session.user, name: 'Me', self: true };
-    try {
-      const mine = await call(`/rest/v1/profiles?id=eq.${session.user}&select=display_name`);
-      if (mine[0]?.display_name) me.name = mine[0].display_name;
-    } catch {}
-    let others = [];
-    try {
-      const follows = await call(`/rest/v1/follows?follower=eq.${session.user}&select=owner`);
-      const ids = follows.map((f) => f.owner);
-      if (ids.length) {
-        const names = await call(`/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,display_name`);
-        others = ids.map((id) => ({ id, name: names.find((n) => n.id === id)?.display_name || '…', self: false }));
-      }
-    } catch {}
-    people = [me, ...others];
-    if (!people.some((p) => p.id === chosen)) chosen = me.id;
-  }
-  async function loadReadings(id) {
-    const since = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
-    const rows = await call(`/rest/v1/readings?user_id=eq.${id}&ts=gte.${encodeURIComponent(since)}&order=ts.asc&select=ts,mg_dl,trend`);
-    if (rows.length) return rows.map((r) => ({ at: Date.parse(r.ts), v: r.mg_dl, trend: r.trend }));
-    const last = await call(`/rest/v1/readings?user_id=eq.${id}&order=ts.desc&limit=1&select=ts,mg_dl,trend`);
-    return last.map((r) => ({ at: Date.parse(r.ts), v: r.mg_dl, trend: r.trend }));
+  async function loadReadings() {
+    const res = await request(`${FEED}/api/v1/entries/sgv.json?count=200&token=${token}`, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !Array.isArray(json)) { const e = new Error(json?.error || `HTTP ${res.status}`); e.status = res.status || 400; throw e; }
+    const since = Date.now() - 3 * 3600 * 1000;
+    const all = json.filter((r) => r.sgv && r.date).map((r) => ({ at: r.date, v: r.sgv, trend: TREND[r.direction] ?? null })).sort((a, b) => a.at - b.at);
+    const recent = all.filter((r) => r.at >= since);
+    return recent.length ? recent : all.slice(-1);
   }
 
   // what the readings say: the app's own lines, the same as Sukoon's follow page
@@ -94,11 +74,8 @@ function createSukoon({ store, encrypt, decrypt, onChange = () => {}, onEvent = 
     return { kind, v, trend: last.trend, minutes, fresh: isFresh, headingIn, spark };
   }
 
-  function emit() {
-    onChange(status());
-  }
   function status() {
-    return { connected: !!session, email: session?.email || '', people, chosen, error, glucose: snapshot };
+    return { connected: !!token, error, glucose: snapshot };
   }
   // tell the island what changed: going low, urgent, heading low, high, back in range, no signal
   function events(s) {
@@ -109,10 +86,7 @@ function createSukoon({ store, encrypt, decrypt, onChange = () => {}, onEvent = 
     lastHeading = heading;
     if (was === null || s.kind === 'none') return; // the first look just shows the state, no alert
     if (s.kind !== was) {
-      if (s.kind === 'urgent') onEvent({ type: 'urgent', ...s });
-      else if (s.kind === 'low') onEvent({ type: 'low', ...s });
-      else if (s.kind === 'high') onEvent({ type: 'high', ...s });
-      else if (s.kind === 'gone') onEvent({ type: 'gone', ...s });
+      if (['urgent', 'low', 'high', 'gone'].includes(s.kind)) onEvent({ type: s.kind, ...s });
       else if (s.kind === 'ok' && ['low', 'urgent', 'high'].includes(was)) onEvent({ type: 'inrange', from: was, ...s });
     } else if (s.kind === 'urgent') onEvent({ type: 'urgent', repeat: true, ...s }); // urgent keeps saying so, every reading
     if (heading && !wasHeading) onEvent({ type: 'heading', ...s });
@@ -121,61 +95,53 @@ function createSukoon({ store, encrypt, decrypt, onChange = () => {}, onEvent = 
   async function poll() {
     clearTimeout(timer);
     timer = setTimeout(poll, POLL_MS);
-    if (!session) return;
+    if (!token) return;
     try {
-      await fresh();
-      if (!people.length) await loadPeople();
-      const readings = await loadReadings(chosen);
-      const person = people.find((p) => p.id === chosen);
-      snapshot = { ...read(readings), name: person?.name || '', self: !!person?.self, at: Date.now() };
+      snapshot = { ...read(await loadReadings()), self: true, at: Date.now() };
       error = '';
       events(snapshot);
     } catch (err) {
-      if (err.status === 401 || err.status === 400) { log(`sukoon: signed out (${err.message})`); session = null; persist(); error = 'Signed out. Sign in again.'; snapshot = null; }
-      else error = /fetch|network|timeout|abort/i.test(err.message) ? 'Offline' : err.message;
+      if (err.status === 401 || err.status === 403 || err.status === 404) { log(`sukoon: link refused (${err.message})`); error = 'Sukoon doesn’t accept this link any more. Paste a new one.'; snapshot = null; }
+      else { log(`sukoon: ${err.message}`); error = 'Offline'; }
     }
-    emit();
+    onChange(status());
   }
 
   return {
     status,
-    start() { if (session) poll(); },
+    start() {
+      if (!token) { const t = rainmeterToken(); if (t) { token = t; persist(); log('sukoon: using the Rainmeter widget link'); } }
+      if (token) poll();
+    },
     stop() { clearTimeout(timer); },
     refresh: poll,
-    async signIn(email, password) {
-      try {
-        keep(await call('/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password }, auth: false }), email);
-        error = ''; people = []; lastKind = null;
-        await loadPeople();
-        persist();
-        await poll();
-        return { ok: true };
-      } catch (err) {
-        error = err.status ? (/confirm/i.test(err.message) ? 'Confirm your email first.' : 'That email and password don’t match a Sukoon account.') : 'Offline';
-        emit();
-        return { ok: false, error };
-      }
+    async setLink(link) {
+      const t = tokenOf(link);
+      if (!t) return { ok: false, error: 'That isn’t a Sukoon Widget link.' };
+      token = t; lastKind = null; error = ''; persist();
+      await poll();
+      return error && error !== 'Offline' ? { ok: false, error } : { ok: true };
     },
-    signOut() { session = null; people = []; snapshot = null; lastKind = null; error = ''; persist(); emit(); },
-    async choose(id) { if (people.some((p) => p.id === id)) { chosen = id; lastKind = null; persist(); await poll(); } },
-    read, // (for the self-check)
+    signOut() { token = ''; snapshot = null; lastKind = null; error = ''; persist(); onChange(status()); },
+    read, tokenOf, // (for the self-check)
   };
 }
 
 module.exports = { createSukoon };
 
 if (require.main === module) {
-  // self-check of the state lines, with made-up readings
+  // self-check of the state lines and the link parsing, with made-up readings
   const s = createSukoon({ store: { load: () => ({}), save() {} }, encrypt: (x) => Buffer.from(x), decrypt: (b) => b.toString() });
   const now = Date.now(), at = (m) => now - m * 60000;
-  const series = (vals) => vals.map(([m, v, t = 0]) => ({ at: at(m), v, trend: t }));
-  const k = (vals) => s.read(series(vals), now);
+  const k = (vals) => s.read(vals.map(([m, v, t = 0]) => ({ at: at(m), v, trend: t })), now);
   console.assert(k([[1, 120]]).kind === 'ok', 'in range');
   console.assert(k([[1, 64, -1]]).kind === 'low', 'low');
   console.assert(k([[1, 52, -2]]).kind === 'urgent', 'urgent');
   console.assert(k([[1, 210, 1]]).kind === 'high', 'high');
   console.assert(k([[25, 120]]).kind === 'gone', 'no signal');
   const falling = k([[15, 130], [10, 115], [5, 100], [0, 88]]);
-  console.assert(falling.kind === 'ok' && falling.headingIn > 0, 'heading low ' + JSON.stringify(falling));
-  console.log('sukoon ok', falling.headingIn, 'min to 70');
+  console.assert(falling.kind === 'ok' && falling.headingIn > 0, 'heading low');
+  const tok = 'ab'.repeat(32);
+  console.assert(s.tokenOf(`${FEED}/api/v1/entries.json?token=${tok}`) === tok && s.tokenOf(` ${tok} `) === tok && !s.tokenOf('nope'), 'link');
+  console.log('sukoon ok', falling.headingIn, 'min to 70; rainmeter token', rainmeterToken() ? 'found' : 'none');
 }
