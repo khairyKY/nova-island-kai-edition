@@ -6,10 +6,10 @@
 body { --sk-ok: 130, 187, 160; --sk-high: 229, 184, 119; --sk-low: 240, 160, 151; --sk-gone: 163, 154, 139; --sk-alarm: 201, 86, 75; }
 body:is([data-theme="kai-day"], [data-theme="kai-fern-day"], [data-theme="retro"], [data-theme="nody"]) {
   --sk-ok: 62, 122, 99; --sk-high: 138, 90, 30; --sk-low: 162, 63, 53; --sk-gone: 138, 130, 117; }
-.gl-slide, .l-toast[class*=' gl-'] { --gl: var(--sk-ok); }
-.gl-slide[data-kind='high'], .l-toast:is(.gl-high, .gl-heading) { --gl: var(--sk-high); }
-.gl-slide:is([data-kind='low'], [data-kind='urgent']), .l-toast:is(.gl-low, .gl-urgent) { --gl: var(--sk-low); }
-.gl-slide[data-kind='gone'], .l-toast.gl-gone { --gl: var(--sk-gone); }
+:is(.gl-slide, .stats-glucose), .l-toast[class*=' gl-'] { --gl: var(--sk-ok); }
+:is(.gl-slide, .stats-glucose)[data-kind='high'], .l-toast:is(.gl-high, .gl-heading) { --gl: var(--sk-high); }
+:is(.gl-slide, .stats-glucose):is([data-kind='low'], [data-kind='urgent']), .l-toast:is(.gl-low, .gl-urgent) { --gl: var(--sk-low); }
+:is(.gl-slide, .stats-glucose)[data-kind='gone'], .l-toast.gl-gone { --gl: var(--sk-gone); }
 
 /* ---- the odometer number: each digit a column 0-9 sliding to its place, left to right ---- */
 .gl-num { display: inline-flex; line-height: 1; height: 1em; overflow: hidden; }
@@ -25,7 +25,7 @@ body:is([data-theme="kai-day"], [data-theme="kai-fern-day"], [data-theme="retro"
 .gl-arrow.gone { opacity: 0; }
 
 /* ---- the slide ---- */
-.gl-slide .i-strong { color: rgb(var(--gl)); font-size: 14px; transition: color .6s ease; }
+:is(.gl-slide, .stats-glucose) .i-strong { color: rgb(var(--gl)); font-size: 14px; transition: color .6s ease; }
 .gl-unit { font-size: 10px; }
 .gl-who { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gl-who:empty { display: none; }
@@ -33,13 +33,13 @@ body:is([data-theme="kai-day"], [data-theme="kai-fern-day"], [data-theme="retro"
 .gl-live::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: rgb(var(--gl));
   animation: gl-ping 2.4s cubic-bezier(0, 0, .2, 1) infinite; }
 @keyframes gl-ping { 0% { transform: scale(1); opacity: .7; } 70%, 100% { transform: scale(2.8); opacity: 0; } }
-.gl-slide[data-kind='gone'] .gl-live::after { animation: none; }
-.gl-slide[data-kind='urgent'] .gl-live::after { animation-duration: .9s; }
-.gl-slide[data-kind='low'] .gl-live::after { animation-duration: 1.4s; }
+:is(.gl-slide, .stats-glucose)[data-kind='gone'] .gl-live::after { animation: none; }
+:is(.gl-slide, .stats-glucose)[data-kind='urgent'] .gl-live::after { animation-duration: .9s; }
+:is(.gl-slide, .stats-glucose)[data-kind='low'] .gl-live::after { animation-duration: 1.4s; }
 /* urgent: the number glows on a heartbeat */
-.gl-slide[data-kind='urgent'] .gl-num { animation: gl-throb 1.1s ease-in-out infinite; }
+:is(.gl-slide, .stats-glucose)[data-kind='urgent'] .gl-num { animation: gl-throb 1.1s ease-in-out infinite; }
 @keyframes gl-throb { 0%, 100% { text-shadow: 0 0 0 transparent; } 15%, 45% { text-shadow: 0 0 8px rgba(var(--sk-alarm), .95); } 30% { text-shadow: 0 0 2px rgba(var(--sk-alarm), .4); } }
-.gl-slide[data-kind='gone'] .gl-num { opacity: .55; }
+:is(.gl-slide, .stats-glucose)[data-kind='gone'] .gl-num { opacity: .55; }
 
 /* the sparkline: the 70-180 band faintly behind, the line draws itself on a new reading */
 .gl-spark { width: 56px; height: 16px; overflow: visible; }
@@ -152,3 +152,7 @@ body:is([data-theme="kai-day"], [data-theme="kai-fern-day"], [data-theme="retro"
 #island.toast:not(.vertical)[data-wide-toast="gl-heading"] { --w: 430px; }
 #island.toast:not(.vertical)[data-wide-toast="gl-high"] { --w: 360px; }
 #island.toast:not(.vertical)[data-wide-toast="gl-inrange"] { --w: 400px; }
+
+/* the CPU · RAM slide carries the reading too; the bars step aside to make room for it */
+.stats-glucose { gap: 5px !important; }
+.stats-slide.has-gl > .side:not(.browser-stat, .stats-glucose) .i-bar { display: none; }

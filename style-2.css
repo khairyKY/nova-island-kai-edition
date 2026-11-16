@@ -396,3 +396,10 @@ body.no-anim .pd-pill { animation: none; }
 #island.toast:not(.vertical):is([data-wide-toast="saver"], [data-wide-toast="saver-stays"], [data-wide-toast="saver-off"], [data-wide-toast="perf"]) { --w: 400px; }
 #island.toast:not(.vertical):is([data-wide-toast="battery"], [data-wide-toast="low"]) { --w: 380px; }
 #island.toast:not(.vertical)[data-wide-toast="suggest"] { --w: 470px; }
+
+/* the next prayer's icon in its own light (views/prayer.js): rose dawn, noon gold, afternoon amber,
+   sunset orange, night blue; a theme's own colour still wins */
+.i-moon:where([data-prayer='fajr']) { color: #f9b8a6; }
+.i-moon:where([data-prayer='asr']) { color: #ffb347; }
+.i-moon:where([data-prayer='maghrib']) { color: #ff8a5c; }
+.i-moon:where([data-prayer='isha']) { color: #b9c6ff; }

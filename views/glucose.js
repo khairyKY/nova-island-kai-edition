@@ -5,6 +5,7 @@
 (() => {
   const slide = $('.gl-slide');
   const num = $('#i-gl-num');
+  const stat = $('.stats-glucose');
   const ARROW_DEG = [90, 45, 0, -45, -90]; // trend -2..2: straight down … straight up
   const ARROW_CH = ['↓', '↘', '→', '↗', '↑'];
   const PINNED = ['low', 'urgent'];
@@ -60,12 +61,19 @@
   function show(g) {
     const on = !!g && g.kind !== 'none' && g.v != null;
     slide.hidden = !on;
+    // the same reading, compact, beside CPU and RAM
+    stat.hidden = !on;
+    stat.parentElement.classList.toggle('has-gl', on);
     if (!on) { slide.classList.remove('pin'); return; }
-    slide.dataset.kind = g.kind;
+    for (const el of [slide, stat]) {
+      el.dataset.kind = g.kind;
+      const arrow = el.querySelector('.gl-arrow');
+      arrow.style.setProperty('--rot', `${arrowDeg(g.trend)}deg`);
+      arrow.classList.toggle('gone', g.trend == null || g.kind === 'gone');
+    }
     roll(num, g.v);
-    const arrow = $('.gl-arrow');
-    arrow.style.setProperty('--rot', `${arrowDeg(g.trend)}deg`);
-    arrow.classList.toggle('gone', g.trend == null || g.kind === 'gone');
+    roll($('#i-gl-stat'), g.v);
+    fitBrowserStats();
     $('#i-gl-ago').textContent = ago(g.minutes || 0);
     $('#i-gl-who').textContent = g.self === false ? g.name : '';
     spark(g);
