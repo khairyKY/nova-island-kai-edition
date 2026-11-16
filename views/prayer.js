@@ -14,7 +14,7 @@
     dhuhr: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>',
     asr: '<circle cx="12" cy="14" r="3.5"/><path d="M3 21h18M12 6.5V8M6.3 8.3l1.1 1.1M17.7 8.3l-1.1 1.1M4 14h1.5M18.5 14H20"/>',
     maghrib: `<path d="M4 18h16M8 18a4 4 0 0 1 8 0M3 22h18M12 3v6M9 6l3 3 3-3M${RAYS.slice(1)}"/>`,
-    isha: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/><path d="M19 2v4M17 4h4"/>',
+    isha: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/><path d="M19 1.8l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6Z" fill="currentColor" stroke-width="1"/>',
   };
   let iconKey = '';
 
