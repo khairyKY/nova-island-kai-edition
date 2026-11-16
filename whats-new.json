@@ -1,8 +1,18 @@
 [
   {
     "version": "1.7.21",
-    "summary": "The gazelle, companions that follow the pointer, focus apps, a quieter adhan",
+    "summary": "Sukoon glucose on the island, the gazelle, companions that follow the pointer, focus apps",
     "items": [
+      {
+        "icon": "🩸",
+        "title": "Sukoon on the island",
+        "text": "Paste your Sukoon Widget link (Settings › Connections › Sukoon) and your glucose lives in the collapsed island: a number that rolls, an arrow that turns with the trend and the last three hours, in Sukoon’s colours. Going low, urgent low, heading low, high, back in range and no signal each get an animated notice."
+      },
+      {
+        "icon": "🌅",
+        "title": "Each prayer has its own icon",
+        "text": "The next prayer in the island shows its time of day: dawn rising for Fajr, the full sun at Dhuhr, the low sun at Asr, sunset at Maghrib and the moon at Isha."
+      },
       {
         "icon": "🦌",
         "title": "A new companion: the gazelle",
